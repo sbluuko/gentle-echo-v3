@@ -1,0 +1,20 @@
+{
+  "cli": {
+    "version": ">= 7.0.0"
+  },
+  "build": {
+    "iosTestFlight": {
+      "distribution": "store"
+    },
+    "androidInternal": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    }
+  },
+  "submit": {
+    "iosTestFlight": {},
+    "androidInternal": {}
+  }
+}
