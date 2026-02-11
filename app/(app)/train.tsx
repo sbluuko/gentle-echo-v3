@@ -1,29 +1,177 @@
+// app/(app)/train.tsx — FULL REPLACEMENT (SCROLL + FIXED FOOTER PATTERN)
+// ✅ Content scrolls if needed (small Android screens)
+// ✅ Bottom buttons live in a fixed footer and never go off-screen
+// ✅ SafeArea correct on iOS + Android (footer respects insets.bottom)
+// ✅ No absolute positioning hacks
+// ✅ Keeps your existing boot guard + training flow + success modal
+
 import { Audio } from "expo-av";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
-import React, { useRef, useState } from "react";
-import { Alert, ScrollView, Text, TouchableOpacity } from "react-native";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Alert,
+  Animated,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { supabase } from "../../lib/supabase";
 
 const MAKE_CREATEVOICE_URL =
-  "PASTE_YOUR_MAKE_CREATEVOICE_WEBHOOK_URL_HERE";
+  "https://hook.us2.make.com/j1ctu3nosul9ddy3lf2jsgmv8snq8p1j";
 
-const MIN_SECONDS = 45;
+const MIN_SECONDS = 30;
+const MAX_SECONDS = 90;
+
+// Footer sizing (used to pad ScrollView content so it won't hide behind footer)
+const FOOTER_BASE_HEIGHT = 112; // buttons + padding (approx)
 
 export default function Train() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+
   const recordingRef = useRef<Audio.Recording | null>(null);
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const durationIntervalRef = useRef<any>(null);
+
+  const fade = useRef(new Animated.Value(0)).current;
+  const lift = useRef(new Animated.Value(8)).current;
+
+  const [busy, setBusy] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
   const [recordingUri, setRecordingUri] = useState<string | null>(null);
   const [durationSec, setDurationSec] = useState<number>(0);
-  const [busy, setBusy] = useState(false);
+
+  const [userId, setUserId] = useState<string | null>(null);
+  const [bootChecking, setBootChecking] = useState(true);
+
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fade, { toValue: 1, duration: 380, useNativeDriver: true }),
+      Animated.timing(lift, { toValue: 0, duration: 380, useNativeDriver: true }),
+    ]).start();
+
+    return () => {
+      if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
+      safeUnloadSound();
+      // If a recording is active and component unmounts, avoid leaving it hanging.
+      try {
+        recordingRef.current?.stopAndUnloadAsync?.().catch(() => {});
+      } catch {}
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const safeUnloadSound = async () => {
+    try {
+      const s = soundRef.current;
+      if (s) {
+        soundRef.current = null;
+        await s.stopAsync().catch(() => {});
+        await s.unloadAsync().catch(() => {});
+      }
+    } catch {}
+  };
+
+  // ✅ Boot guard: if already trained, do NOT allow Train screen
+  useEffect(() => {
+    let cancelled = false;
+
+    const boot = async () => {
+      try {
+        setBootChecking(true);
+
+        const { data: authData, error: authErr } = await supabase.auth.getUser();
+        if (authErr || !authData?.user?.id) {
+          if (!cancelled) Alert.alert("Not logged in", "Please sign in again.");
+          return;
+        }
+
+        const uid = authData.user.id;
+        if (cancelled) return;
+        setUserId(uid);
+
+        const { data: profile, error: profErr } = await supabase
+          .from("profiles")
+          .select("voice_ready, voice_id")
+          .eq("id", uid)
+          .single();
+
+        if (cancelled) return;
+
+        // ✅ Redirect trained users to home
+        if (!profErr && profile?.voice_ready === true && profile?.voice_id) {
+          router.replace("/(app)/welcome");
+          return;
+        }
+      } finally {
+        if (!cancelled) setBootChecking(false);
+      }
+    };
+
+    boot();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
+  const scriptText = useMemo(
+    () =>
+      [
+        "I’m recording this script one time only to let Gentle Echo learn the natural sound of my voice so my reflections play back in a fully personalized message.",
+        "",
+        "There’s no need to speak perfectly. If I pause, repeat myself, or stumble over a word or two, that’s completely fine. Natural speech actually helps create a better voice match. I can also re-record my message before sending.",
+        "",
+        "I just need to make sure the recording is at least 45 seconds in length.",
+        "",
+        "My voice clone will be kept private and used only for my own reflections. I can easily delete my profile at any time.",
+        "",
+        "Gentle Echo is where I can freely express my thoughts and receive a meesage of clarity in return. When stress hijacks my thinking, I can talk it out, clear my head and regain clarity.",
+        "",
+        "I give my consent for Gentle Echo to create and securely store a private voice identifier for generating audio in my voice.",
+      ].join("\n"),
+    []
+  );
+
+  const clearRecordingState = async () => {
+    await safeUnloadSound();
+    setRecordingUri(null);
+    setDurationSec(0);
+  };
+
+  const updateDurationTimer = async () => {
+    try {
+      const rec = recordingRef.current;
+      if (!rec) return;
+      const status: any = await rec.getStatusAsync();
+      setDurationSec(Math.floor((status?.durationMillis ?? 0) / 1000));
+    } catch {}
+  };
 
   const startRecording = async () => {
+    if (busy || isRecording || isCreating || bootChecking) return;
+
     try {
       setBusy(true);
-      setRecordingUri(null);
-      setDurationSec(0);
+      await clearRecordingState();
 
-      await Audio.requestPermissionsAsync();
+      const perm = await Audio.requestPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert("Microphone access needed", "Please allow microphone access.");
+        return;
+      }
+
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
@@ -32,116 +180,415 @@ export default function Train() {
       const rec = new Audio.Recording();
       await rec.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
       await rec.startAsync();
+
       recordingRef.current = rec;
+      setIsRecording(true);
+
+      durationIntervalRef.current = setInterval(updateDurationTimer, 250);
     } catch (e: any) {
-      Alert.alert("Recording error", String(e));
+      Alert.alert("Recording error", String(e?.message ?? e));
+      setIsRecording(false);
+      recordingRef.current = null;
     } finally {
       setBusy(false);
     }
   };
 
   const stopRecording = async () => {
+    if (busy || !isRecording || isCreating || bootChecking) return;
+
     try {
       setBusy(true);
+      if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
+
       const rec = recordingRef.current;
       if (!rec) return;
 
       await rec.stopAndUnloadAsync();
       const uri = rec.getURI();
-      const status = await rec.getStatusAsync();
+      const status: any = await rec.getStatusAsync();
 
       recordingRef.current = null;
+      setIsRecording(false);
+
+      const secs = Math.floor((status?.durationMillis ?? 0) / 1000);
+      setDurationSec(secs);
+
+      if (secs < MIN_SECONDS) {
+        await clearRecordingState();
+        Alert.alert("Recording too short", `Please record at least ${MIN_SECONDS} seconds.`);
+        return;
+      }
+      if (secs > MAX_SECONDS) {
+        await clearRecordingState();
+        Alert.alert(
+          "Recording too long",
+          `Please keep the recording to ${MAX_SECONDS} seconds or less.`
+        );
+        return;
+      }
+
       setRecordingUri(uri ?? null);
-      setDurationSec(Math.floor((status.durationMillis ?? 0) / 1000));
     } catch (e: any) {
-      Alert.alert("Stop error", String(e));
+      Alert.alert("Stop error", String(e?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const playRecording = async () => {
+    if (!recordingUri || busy || isRecording || isCreating || bootChecking) return;
+
+    try {
+      setBusy(true);
+      await safeUnloadSound();
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+      });
+
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: recordingUri },
+        { shouldPlay: true }
+      );
+      soundRef.current = sound;
+
+      sound.setOnPlaybackStatusUpdate((st: any) => {
+        if (st?.didJustFinish) {
+          safeUnloadSound();
+        }
+      });
+    } catch (e: any) {
+      Alert.alert("Playback error", String(e?.message ?? e));
     } finally {
       setBusy(false);
     }
   };
 
   const uploadTraining = async () => {
-    if (!recordingUri) return;
+    if (!recordingUri || isCreating || busy || bootChecking) return;
 
-    if (durationSec < MIN_SECONDS) {
-      Alert.alert(
-        "Recording too short",
-        `Please record at least ${MIN_SECONDS} seconds.`
-      );
+    if (!userId) {
+      Alert.alert("Not signed in", "Please sign in again.");
       return;
     }
 
     try {
-      setBusy(true);
+      setIsCreating(true);
 
       const fs: any = FileSystem as any;
-      const uploadType =
-        fs?.FileSystemUploadType?.MULTIPART ?? ("multipart" as any);
+      const uploadType = fs?.FileSystemUploadType?.MULTIPART ?? ("multipart" as any);
 
-      const res = await FileSystem.uploadAsync(
-        MAKE_CREATEVOICE_URL,
-        recordingUri,
-        {
-          httpMethod: "POST",
-          uploadType,
-          fieldName: "file",
-          mimeType: "audio/m4a",
-          parameters: {
-            mode: "train",
-          },
-        }
-      );
+      const res = await FileSystem.uploadAsync(MAKE_CREATEVOICE_URL, recordingUri, {
+        httpMethod: "POST",
+        uploadType,
+        fieldName: "file",
+        mimeType: "audio/m4a",
+        parameters: { mode: "train", userId },
+      });
 
       if (res.status < 200 || res.status >= 300) {
         throw new Error(`Training failed (${res.status})`);
       }
 
-      Alert.alert(
-        "Voice Created",
-        "Training complete. You will now be taken to the app.",
-        [
-          {
-            text: "Continue",
-            onPress: () => router.replace("/main"),
-          },
-        ]
-      );
+      let returnedVoiceId: string | null = null;
+      const rawBody = (res as any)?.body;
+      if (rawBody && typeof rawBody === "string") {
+        try {
+          const parsed = JSON.parse(rawBody);
+          if (typeof parsed?.voice_id === "string") returnedVoiceId = parsed.voice_id;
+          if (typeof parsed?.voiceId === "string") returnedVoiceId = parsed.voiceId;
+        } catch {}
+      }
+
+      const updatePayload: any = { voice_ready: true };
+      if (returnedVoiceId) updatePayload.voice_id = returnedVoiceId;
+
+      const { error: updErr } = await supabase
+        .from("profiles")
+        .update(updatePayload)
+        .eq("id", userId);
+      if (updErr) throw new Error(`Profile update failed: ${updErr.message}`);
+
+      setShowSuccessModal(true);
     } catch (e: any) {
-      Alert.alert("Training error", String(e));
+      Alert.alert("Training error", String(e?.message ?? e));
     } finally {
-      setBusy(false);
+      setIsCreating(false);
     }
   };
 
+  const readyToCreate =
+    !!recordingUri && durationSec >= MIN_SECONDS && durationSec <= MAX_SECONDS;
+
+  const disableAll = busy || isCreating || bootChecking;
+
+  const recordDisabled = disableAll || isRecording;
+  const stopDisabled = disableAll || !isRecording;
+  const listenDisabled = disableAll || isRecording || !recordingUri;
+  const createDisabled = disableAll || isRecording || !readyToCreate;
+
+  // Scroll content padding so it will never hide behind footer
+  const footerHeight = FOOTER_BASE_HEIGHT + insets.bottom;
+
   return (
-    <ScrollView contentContainerStyle={{ padding: 16, backgroundColor: "#fff" }}>
-      <Text style={{ fontSize: 22, fontWeight: "800" }}>
-        Voice Training
-      </Text>
-
-      <Text style={{ marginVertical: 12 }}>
-        Record a calm, natural voice sample (45–60 seconds).
-        This will be used to create your personal voice.
-      </Text>
-
-      <TouchableOpacity onPress={startRecording} disabled={busy}>
-        <Text>Start Training Recording</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity onPress={stopRecording} disabled={busy}>
-        <Text>Stop Recording</Text>
-      </TouchableOpacity>
-
-      <Text>
-        Duration: {durationSec > 0 ? `${durationSec}s` : "(not recorded)"}
-      </Text>
-
-      <TouchableOpacity
-        onPress={uploadTraining}
-        disabled={busy || !recordingUri}
+    <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 16 : 0}
       >
-        <Text>Create Voice</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        {/* ✅ Screen layout: Scrollable content + Fixed footer (no absolute positioning) */}
+        <Animated.View style={[styles.screen, { opacity: fade, transform: [{ translateY: lift }] }]}>
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={[
+              styles.scrollContent,
+              {
+                paddingTop: 48, // your "lowered top" requirement (~0.5 inch)
+                paddingBottom: footerHeight + 12,
+              },
+            ]}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Script */}
+            <View style={styles.card}>
+              <Text style={styles.cardBody}>{scriptText}</Text>
+            </View>
+
+            <Text style={styles.progressText}>
+              {bootChecking
+                ? "Checking profile…"
+                : isRecording
+                ? `Recording… ${durationSec}s`
+                : `Duration: ${durationSec}s`}
+            </Text>
+
+            {/* Optional helper line */}
+            <Text style={styles.hintText}>
+              Record between {MIN_SECONDS}-{MAX_SECONDS} seconds, then create your voice.
+            </Text>
+          </ScrollView>
+
+          {/* ✅ Fixed Footer (buttons never go off-screen) */}
+          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+            {/* Row 1: Record + Stop */}
+            <View style={styles.footerRow}>
+              <TouchableOpacity
+                activeOpacity={0.9}
+                disabled={recordDisabled}
+                onPress={startRecording}
+                style={[styles.squareBtn, styles.greenBtn, recordDisabled && styles.btnDisabled]}
+              >
+                <Text style={styles.btnText}>{isRecording ? "Recording…" : "Record"}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.9}
+                disabled={stopDisabled}
+                onPress={stopRecording}
+                style={[styles.squareBtn, styles.redBtn, stopDisabled && styles.btnDisabled]}
+              >
+                <Text style={styles.btnText}>Stop</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Row 2: Listen + Create Voice */}
+            <View style={styles.footerRow}>
+              <TouchableOpacity
+                activeOpacity={0.9}
+                disabled={listenDisabled}
+                onPress={playRecording}
+                style={[styles.wideBtn, styles.blueBtn, listenDisabled && styles.btnDisabled]}
+              >
+                <Text style={styles.btnTextSmall}>Listen to Your Recording</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.9}
+                disabled={createDisabled}
+                onPress={uploadTraining}
+                style={[styles.wideBtn, styles.greenBtn, createDisabled && styles.btnDisabled]}
+              >
+                <Text style={styles.btnTextSmall}>{isCreating ? "Creating…" : "Create Voice"}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* ✅ Success modal */}
+          <Modal visible={showSuccessModal} transparent animationType="fade" onRequestClose={() => {}}>
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalCard}>
+                <Text style={styles.modalTitle}>Your voice clone is ready</Text>
+
+                <Text style={styles.modalBody}>
+                  Your voice clone has been successfully recorded.
+                  {"\n\n"}
+                  You can now proceed to the home screen.
+                </Text>
+
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  style={styles.modalButton}
+                  onPress={() => {
+                    setShowSuccessModal(false);
+                    router.replace("/(app)/welcome");
+                  }}
+                >
+                  <Text style={styles.modalButtonText}>Continue</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+        </Animated.View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: "#26384C" },
+  container: { flex: 1, backgroundColor: "#26384C" },
+  screen: { flex: 1 },
+
+  scroll: { flex: 1 },
+  scrollContent: {
+    paddingHorizontal: 16,
+    justifyContent: "flex-start",
+  },
+
+  card: {
+    borderRadius: 14,
+    backgroundColor: "rgba(0,0,0,0.20)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 10,
+  },
+
+  cardBody: {
+    color: "#ffffff",
+    fontSize: 13.4,
+    lineHeight: 19.5,
+    fontWeight: "400",
+    textAlign: "center",
+  },
+
+  progressText: {
+    textAlign: "center",
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "800",
+    marginTop: 6,
+    marginBottom: 6,
+    opacity: 0.92,
+  },
+
+  hintText: {
+    textAlign: "center",
+    color: "rgba(255,255,255,0.75)",
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+
+  // Footer
+  footer: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    backgroundColor: "#26384C",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.10)",
+  },
+
+  footerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 10,
+  },
+
+  squareBtn: {
+    flex: 1,
+    height: 64,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  wideBtn: {
+    flex: 1,
+    height: 64,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 10,
+  },
+
+  greenBtn: { backgroundColor: "#16a34a" },
+  redBtn: { backgroundColor: "#dc2626" },
+  blueBtn: { backgroundColor: "#2563eb" },
+
+  btnDisabled: { opacity: 0.45 },
+
+  btnText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "900",
+    letterSpacing: 0.2,
+  },
+
+  btnTextSmall: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "900",
+    letterSpacing: 0.15,
+    textAlign: "center",
+  },
+
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 18,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 420,
+    backgroundColor: "#26384C",
+    borderRadius: 16,
+    padding: 22,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+  },
+  modalTitle: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "900",
+    textAlign: "center",
+    marginBottom: 10,
+  },
+  modalBody: {
+    color: "#D6DEE8",
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: "center",
+    marginBottom: 18,
+  },
+  modalButton: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  modalButtonText: {
+    color: "#26384C",
+    fontSize: 16,
+    fontWeight: "900",
+  },
+});

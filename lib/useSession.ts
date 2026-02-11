@@ -14,7 +14,14 @@ export function useSession() {
       if (!isMounted) return;
 
       if (error) {
-        console.log("DEBUG getSession error:", error.message);
+        // ✅ If refresh token is invalid/missing, wipe local auth so app can recover cleanly
+        const msg = String(error.message || "");
+        if (msg.toLowerCase().includes("invalid refresh token")) {
+          await supabase.auth.signOut();
+          setSession(null);
+          setIsLoading(false);
+          return;
+        }
       }
 
       setSession(data.session ?? null);
@@ -24,7 +31,6 @@ export function useSession() {
     init();
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      console.log("DEBUG auth change event:", _event, newSession?.user?.id ?? null);
       setSession(newSession ?? null);
     });
 

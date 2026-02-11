@@ -23,6 +23,7 @@
     },
     "android": {
       "package": "com.gentleechov2.app",
+      "versionCode": 2,
       "permissions": [
         "RECORD_AUDIO"
       ],

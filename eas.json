@@ -3,18 +3,13 @@
     "version": ">= 7.0.0"
   },
   "build": {
-    "iosTestFlight": {
-      "distribution": "store"
+    "internal": {
+      "distribution": "internal"
     },
-    "androidInternal": {
-      "distribution": "internal",
+    "production": {
       "android": {
-        "buildType": "apk"
+        "buildType": "app-bundle"
       }
     }
-  },
-  "submit": {
-    "iosTestFlight": {},
-    "androidInternal": {}
   }
 }

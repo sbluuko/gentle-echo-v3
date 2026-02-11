@@ -2,35 +2,46 @@ import { supabase } from "./supabase";
 
 export type Profile = {
   id: string;
-  voice_id: string | null;
   voice_ready: boolean | null;
+  voice_id: string | null;
+  created_at?: string | null;
 };
 
 export async function getOrCreateProfile(userId: string): Promise<Profile> {
-  const { data: existing, error: selErr } = await supabase
+  // 1) Try to read existing profile
+  const { data: existing, error: readErr } = await supabase
     .from("profiles")
-    .select("id, voice_id, voice_ready")
+    .select("id, voice_ready, voice_id, created_at")
     .eq("id", userId)
     .maybeSingle();
 
-  if (selErr) throw selErr;
-  if (existing) return existing as Profile;
+  if (readErr) {
+    throw readErr;
+  }
 
-  const { data: created, error: insErr } = await supabase
+  if (existing) {
+    return existing as Profile;
+  }
+
+  // 2) If missing, create it safely (idempotent)
+  // IMPORTANT: use upsert with onConflict so duplicate inserts never fail
+  const { data: created, error: upsertErr } = await supabase
     .from("profiles")
-    .insert({ id: userId, voice_ready: false })
-    .select("id, voice_id, voice_ready")
+    .upsert(
+      {
+        id: userId,
+        // set sensible defaults; adjust if your table has different defaults
+        voice_ready: false,
+        voice_id: null,
+      },
+      { onConflict: "id" }
+    )
+    .select("id, voice_ready, voice_id, created_at")
     .single();
 
-  if (insErr) throw insErr;
+  if (upsertErr) {
+    throw upsertErr;
+  }
+
   return created as Profile;
-}
-
-export async function setVoiceTrainingComplete(userId: string, voiceId: string) {
-  const { error } = await supabase
-    .from("profiles")
-    .update({ voice_id: voiceId, voice_ready: true })
-    .eq("id", userId);
-
-  if (error) throw error;
 }
