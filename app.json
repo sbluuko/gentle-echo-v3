@@ -2,9 +2,9 @@
   "expo": {
     "name": "GentleEcho",
     "slug": "GentleEcho",
-    "version": "1.0.0",
+    "version": "1.0.4",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/Gentle Echo logo v2.png",
     "scheme": "gentleecho",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -16,6 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.gentleechov2.app",
+      "buildNumber": "1",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Gentle Echo uses the microphone so you can record a reflection and hear it echoed back with calm and clarity.",
         "ITSAppUsesNonExemptEncryption": false
@@ -23,7 +24,7 @@
     },
     "android": {
       "package": "com.gentleechov2.app",
-      "versionCode": 2,
+      "versionCode": 4,
       "permissions": [
         "RECORD_AUDIO"
       ],

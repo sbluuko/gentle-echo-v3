@@ -1,22 +1,12 @@
 // app/(app)/_layout.tsx — FULL REPLACEMENT
-// ✅ SafeAreaProvider added
-// ✅ Overlay top buttons use safe-area insets (no hardcoded top)
-// ✅ Prevents overlays from sitting under notch / status bar
-// ✅ Keeps your existing logic intact
+// ✅ Adds in-app Account Deletion (Apple 5.1.1(v))
+// ✅ Uses Supabase Edge Function: delete-account
+// ✅ Keeps your existing SafeAreaProvider + overlay buttons behavior intact
 
 import { Stack, usePathname, useRouter, useSegments } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { ActivityIndicator, Alert, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { supabase } from "../../lib/supabase";
 import { useProfile } from "../../lib/useProfile";
@@ -49,9 +39,10 @@ function AppLayoutInner() {
   const trainingDone = isTrainingComplete(profile);
 
   const [loggingOut, setLoggingOut] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   const onLogout = async () => {
-    if (loggingOut) return;
+    if (loggingOut || deletingAccount) return;
     try {
       setLoggingOut(true);
       const { error } = await supabase.auth.signOut();
@@ -62,6 +53,56 @@ function AppLayoutInner() {
     } finally {
       setLoggingOut(false);
     }
+  };
+
+  const onDeleteAccount = () => {
+    if (loggingOut || deletingAccount) return;
+
+    Alert.alert(
+      "Delete account?",
+      "This permanently deletes your account and profile. This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert(
+              "Confirm deletion",
+              "Are you sure you want to permanently delete your account?",
+              [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Yes, delete my account",
+                  style: "destructive",
+                  onPress: async () => {
+                    try {
+                      setDeletingAccount(true);
+
+                      const { error } = await supabase.functions.invoke("delete-account");
+                      if (error) {
+                        throw new Error(error.message || "Delete failed");
+                      }
+
+                      await supabase.auth.signOut().catch(() => {});
+                      router.replace("/(auth)");
+                    } catch (e: any) {
+                      Alert.alert(
+                        "Delete failed",
+                        String(e?.message ?? e) ||
+                          "Could not delete your account. Please try again."
+                      );
+                    } finally {
+                      setDeletingAccount(false);
+                    }
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
   };
 
   const onHome = () => router.replace("/(app)/welcome");
@@ -82,11 +123,9 @@ function AppLayoutInner() {
 
   const showTopButtons = !!session && !isLoading;
 
-  // ✅ Bulletproof: hide Home only on the Home screen route
   const isHomeScreen = pathname === "/(app)/welcome";
   const showHomeButton = !isHomeScreen;
 
-  // ✅ Safe top position (no more 40/36 hardcode)
   const overlayTop = Math.max(insets.top, 12) + 8;
 
   return (
@@ -139,34 +178,64 @@ function AppLayoutInner() {
             <View style={{ width: 78, height: 32 }} />
           )}
 
-          {/* LOGOUT (right) */}
-          <TouchableOpacity
-            onPress={onLogout}
-            activeOpacity={0.85}
-            disabled={loggingOut}
-            style={{
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-              borderRadius: 12,
-              backgroundColor: "rgba(0,0,0,0.18)",
-              borderWidth: 1,
-              borderColor: "rgba(255,255,255,0.12)",
-              minWidth: 78,
-              alignItems: "center",
-              opacity: loggingOut ? 0.75 : 1,
-            }}
-          >
-            <Text
+          {/* RIGHT SIDE: Delete Account + Logout */}
+          <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
+            <TouchableOpacity
+              onPress={onDeleteAccount}
+              activeOpacity={0.85}
+              disabled={loggingOut || deletingAccount}
               style={{
-                color: "rgba(242,240,234,0.95)",
-                fontWeight: "900",
-                letterSpacing: 0.2,
-                fontSize: 13,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: 12,
+                backgroundColor: "rgba(220,38,38,0.22)",
+                borderWidth: 1,
+                borderColor: "rgba(255,255,255,0.12)",
+                minWidth: 120,
+                alignItems: "center",
+                opacity: loggingOut || deletingAccount ? 0.75 : 1,
               }}
             >
-              {loggingOut ? "Logging out…" : "Logout"}
-            </Text>
-          </TouchableOpacity>
+              <Text
+                style={{
+                  color: "rgba(242,240,234,0.95)",
+                  fontWeight: "900",
+                  letterSpacing: 0.2,
+                  fontSize: 13,
+                }}
+              >
+                {deletingAccount ? "Deleting…" : "Delete Account"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={onLogout}
+              activeOpacity={0.85}
+              disabled={loggingOut || deletingAccount}
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: 12,
+                backgroundColor: "rgba(0,0,0,0.18)",
+                borderWidth: 1,
+                borderColor: "rgba(255,255,255,0.12)",
+                minWidth: 78,
+                alignItems: "center",
+                opacity: loggingOut || deletingAccount ? 0.75 : 1,
+              }}
+            >
+              <Text
+                style={{
+                  color: "rgba(242,240,234,0.95)",
+                  fontWeight: "900",
+                  letterSpacing: 0.2,
+                  fontSize: 13,
+                }}
+              >
+                {loggingOut ? "Logging out…" : "Logout"}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       ) : null}
 
