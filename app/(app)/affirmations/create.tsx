@@ -2,8 +2,9 @@
 // ✅ Step 1 ONLY: Choose an affirmation (TITLE ONLY)
 // ✅ Tap an item -> routes to /affirmations/script with the FULL affirmation object
 // ✅ Hard gate: must have voice_ready + voice_id, else -> /train
-// ✅ Center title + subtitle
-// ✅ Solid tile colors with MORE distinct variation per tile
+// ✅ Matches Welcome look: background_image.png + overlays + consistent glass styling
+// ✅ Keeps ALL scripts included (unchanged)
+// ✅ Solid tile colors with distinct variation per tile
 // ✅ Removed "Tap to view script" from tiles
 
 import { useRouter } from "expo-router";
@@ -12,19 +13,19 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
-  KeyboardAvoidingView,
-  Platform,
+  ImageBackground,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../../lib/supabase";
 
 type Affirmation = { id: string; title: string; text: string };
 
-// ✅ ALL 9 affirmations — Core line removed from each script
+// ✅ ALL 9 affirmations — Core line removed from each script (unchanged)
 const AFFIRMATIONS: Affirmation[] = [
   {
     id: "a1",
@@ -300,15 +301,15 @@ const AFFIRMATIONS: Affirmation[] = [
 
 // ✅ More distinct solid colors (still fits your dusk palette)
 const TILE_COLORS = [
-  "#3B5B7A", // brighter
-  "#2E6A78", // teal shift
-  "#5A4A84", // violet shift
-  "#1F5F8B", // blue pop
-  "#4B6B3D", // green shift
-  "#7A4E3B", // warm earth
-  "#2F4A73", // deep blue
-  "#5C3E6F", // plum
-  "#1F3E54", // dark anchor
+  "rgba(59, 91, 122, 0.50)",  // #3B5B7A
+  "rgba(46, 106, 120, 0.50)", // #2E6A78
+  "rgba(90, 74, 132, 0.50)",  // #5A4A84
+  "rgba(31, 95, 139, 0.50)",  // #1F5F8B
+  "rgba(75, 107, 61, 0.50)",  // #4B6B3D
+  "rgba(122, 78, 59, 0.50)",  // #7A4E3B
+  "rgba(47, 74, 115, 0.50)",  // #2F4A73
+  "rgba(92, 62, 111, 0.50)",  // #5C3E6F
+  "rgba(31, 62, 84, 0.50)",   // #1F3E54
 ];
 
 export default function CreateAffirmation() {
@@ -370,7 +371,10 @@ export default function CreateAffirmation() {
     };
   }, [router]);
 
-  const subtitle = useMemo(() => "Select an affirmation from the menu below. Tap the title to view the full script.", []);
+  const subtitle = useMemo(
+    () => "Select an affirmation from the menu below.   Tap the title to view the full script.",
+    []
+  );
 
   const openScript = async (a: Affirmation) => {
     if (busyId) return;
@@ -384,65 +388,111 @@ export default function CreateAffirmation() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 30 : 0}
-    >
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <Animated.View style={[styles.inner, { opacity: fade, transform: [{ translateY: lift }] }]}>
-          <Text style={styles.header}>Choose Affirmation</Text>
-          <Text style={styles.sub}>{subtitle}</Text>
+    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+      <ImageBackground
+        source={require("../../../assets/images/background_image.png")}
+        style={styles.bg}
+        resizeMode="cover"
+      >
+        <View style={styles.overlayTop} />
+        <View style={styles.overlayBottom} />
 
-          {checking ? (
-            <View style={styles.loadingBox}>
-              <ActivityIndicator />
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} bounces={false}>
+          <Animated.View style={[styles.inner, { opacity: fade, transform: [{ translateY: lift }] }]}>
+            <View style={styles.headerTile}>
+              <Text style={styles.header}>Choose an Affirmation Script</Text>
+              <Text style={styles.sub}>{subtitle}</Text>
             </View>
-          ) : (
-            <View style={styles.list}>
-              {AFFIRMATIONS.map((a, idx) => {
-                const isBusy = busyId === a.id;
-                const bg = TILE_COLORS[idx % TILE_COLORS.length];
 
-                return (
-                  <TouchableOpacity
-                    key={a.id}
-                    activeOpacity={0.9}
-                    onPress={() => openScript(a)}
-                    disabled={!!busyId}
-                    style={[styles.item, { backgroundColor: bg }, !!busyId && styles.disabled]}
-                  >
-                    <Text style={styles.itemTitle}>{a.title}</Text>
+            {checking ? (
+              <View style={styles.loadingBox}>
+                <ActivityIndicator color={COLORS.text} />
+                <Text style={styles.loadingText}>Loading…</Text>
+              </View>
+            ) : (
+              <View style={styles.list}>
+                {AFFIRMATIONS.map((a, idx) => {
+                  const isBusy = busyId === a.id;
+                  const bg = TILE_COLORS[idx % TILE_COLORS.length];
 
-                    {/* ✅ Removed "Tap to view script" */}
-                    {isBusy ? <Text style={styles.itemOpening}>Opening…</Text> : null}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
-        </Animated.View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+                  return (
+                    <TouchableOpacity
+                      key={a.id}
+                      activeOpacity={0.9}
+                      onPress={() => openScript(a)}
+                      disabled={!!busyId}
+                      style={[styles.item, { backgroundColor: bg }, !!busyId && styles.disabled]}
+                    >
+                      <Text style={styles.itemTitle}>{a.title}</Text>
+                      {isBusy ? <Text style={styles.itemOpening}>Opening…</Text> : null}
+
+                      <View style={{ height: 12 }} />
+
+                      <View style={styles.selectBtn}>
+                        <Text style={styles.selectText}>SELECT</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+
+            <View style={{ height: 26 }} />
+          </Animated.View>
+        </ScrollView>
+      </ImageBackground>
+    </SafeAreaView>
   );
 }
 
 const COLORS = {
-  dusk: "#26384C",
   text: "#F2F0EA",
+  textSoft: "rgba(242,240,234,0.82)",
   textDim: "rgba(242,240,234,0.70)",
+  border: "rgba(255,255,255,0.14)",
+  btnBg: "rgba(255,255,255,0.25)",
+  btnBorder: "rgba(255,255,255,0.18)",
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.dusk },
-  scroll: { padding: 16, paddingBottom: 40 },
-  inner: { paddingTop: 70 },
+  safe: { flex: 1, backgroundColor: "#0B1020" },
+  bg: { flex: 1 },
+
+  overlayTop: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    height: "55%",
+    backgroundColor: "rgba(0,0,0,0.22)",
+  },
+  overlayBottom: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: "65%",
+    backgroundColor: "rgba(0,0,0,0.32)",
+  },
+
+  scroll: { paddingHorizontal: 16, paddingBottom: 40 },
+  inner: { paddingTop: 14 },
+
+  headerTile: {
+    borderRadius: 18,
+    backgroundColor: "rgba(90,255,255,0.40)",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+  },
 
   header: {
     color: COLORS.text,
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "900",
     textAlign: "center",
+    letterSpacing: 0.2,
   },
   sub: {
     marginTop: 8,
@@ -450,17 +500,29 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     lineHeight: 19,
     textAlign: "center",
+    fontWeight: "700",
   },
 
-  loadingBox: { paddingVertical: 30, alignItems: "center", justifyContent: "center" },
+  loadingBox: {
+    marginTop: 18,
+    paddingVertical: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  loadingText: {
+    color: COLORS.textDim,
+    fontSize: 13,
+    fontWeight: "800",
+  },
 
   list: { marginTop: 14, gap: 12 },
 
   item: {
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    paddingVertical: 18,
+    borderColor: "rgba(255,255,255,0.18)",
+    paddingVertical: 16,
     paddingHorizontal: 16,
     alignItems: "center",
     shadowColor: "#000",
@@ -484,6 +546,23 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: "800",
     textAlign: "center",
+  },
+
+  selectBtn: {
+    height: 44,
+    width: "100%",
+    borderRadius: 12,
+    backgroundColor: COLORS.btnBg,
+    borderWidth: 1,
+    borderColor: COLORS.btnBorder,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  selectText: {
+    color: COLORS.text,
+    fontSize: 13,
+    fontWeight: "900",
+    letterSpacing: 0.4,
   },
 
   disabled: { opacity: 0.7 },

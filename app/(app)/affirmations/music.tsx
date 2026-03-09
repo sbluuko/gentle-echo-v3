@@ -1,9 +1,11 @@
 // app/(app)/affirmations/music.tsx — FULL REPLACEMENT
 // Step 3: Music picker with preview + choose
+// ✅ Matches Welcome look: background_image.png + overlays + consistent glass styling
 // ✅ Center title + subtitle
 // ✅ Title: "Choose Your Background Music" (one line)
-// ✅ Subtitle text updated
-// ✅ Back + Select & Continue FLOAT at bottom
+// ✅ Subtitle text updated (kept)
+// ✅ Back + Select & Continue FLOAT at bottom (safe-area aware)
+// ✅ Keeps your preview logic + 15s auto-stop
 
 import { Audio } from "expo-av";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -12,12 +14,14 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  ImageBackground,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Affirmation = { id: string; title: string; text: string };
 type MusicTrack = {
@@ -30,7 +34,6 @@ type MusicTrack = {
 };
 
 const PREVIEW_STOP_MS = 15_000;
-const BOTTOM_BAR_H = 92;
 
 // ✅ Your full + preview pairs
 const MUSIC_TRACKS: MusicTrack[] = [
@@ -40,7 +43,8 @@ const MUSIC_TRACKS: MusicTrack[] = [
     chakra: "Crown Chakra",
     title: "174 Hz — Deep Calm & Clarity",
     url: "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Full/174hz.mp3",
-    previewUrl: "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Preview/174hzPreview.mp3",
+    previewUrl:
+      "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Preview/174hzPreview.mp3",
   },
   {
     id: "freq_285",
@@ -48,7 +52,8 @@ const MUSIC_TRACKS: MusicTrack[] = [
     chakra: "Sacral Chakra",
     title: "285 Hz — Restoration & Replenish",
     url: "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Full/285hz.mp3",
-    previewUrl: "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Preview/285hzPreview.mp3",
+    previewUrl:
+      "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Preview/285hzPreview.mp3",
   },
   {
     id: "freq_396",
@@ -56,7 +61,8 @@ const MUSIC_TRACKS: MusicTrack[] = [
     chakra: "Root Chakra",
     title: "396 Hz — Grounding & Well-Being",
     url: "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Full/396hz.mp3",
-    previewUrl: "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Preview/396hzPreview.mp3",
+    previewUrl:
+      "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Preview/396hzPreview.mp3",
   },
   {
     id: "freq_417",
@@ -64,7 +70,8 @@ const MUSIC_TRACKS: MusicTrack[] = [
     chakra: "Sacral Chakra",
     title: "417 Hz — Release & Flow",
     url: "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Full/417hz.mp3",
-    previewUrl: "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Preview/417hzPreview.mp3",
+    previewUrl:
+      "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Preview/417hzPreview.mp3",
   },
   {
     id: "freq_528",
@@ -72,7 +79,8 @@ const MUSIC_TRACKS: MusicTrack[] = [
     chakra: "Solar Plexus Chakra",
     title: "528 Hz — Confidence & Transformation",
     url: "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Full/528hz.mp3",
-    previewUrl: "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Preview/528hzPreview.mp3",
+    previewUrl:
+      "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Preview/528hzPreview.mp3",
   },
   {
     id: "freq_639",
@@ -80,7 +88,8 @@ const MUSIC_TRACKS: MusicTrack[] = [
     chakra: "Heart Chakra",
     title: "639 Hz — Connection & Compassion",
     url: "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Full/639hz.mp3",
-    previewUrl: "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Preview/639hzPreview.mp3",
+    previewUrl:
+      "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Preview/639hzPreview.mp3",
   },
   {
     id: "freq_741",
@@ -88,7 +97,8 @@ const MUSIC_TRACKS: MusicTrack[] = [
     chakra: "Throat Chakra",
     title: "741 Hz — Expression & Clarity",
     url: "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Full/741hz.mp3",
-    previewUrl: "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Preview/741hzPreview.mp3",
+    previewUrl:
+      "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Preview/741hzPreview.mp3",
   },
   {
     id: "freq_852",
@@ -96,7 +106,8 @@ const MUSIC_TRACKS: MusicTrack[] = [
     chakra: "Third Eye Chakra",
     title: "852 Hz — Insight & Intuition",
     url: "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Full/852hz.mp3",
-    previewUrl: "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Preview/852hzPreview.mp3",
+    previewUrl:
+      "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Preview/852hzPreview.mp3",
   },
   {
     id: "freq_963",
@@ -104,7 +115,8 @@ const MUSIC_TRACKS: MusicTrack[] = [
     chakra: "Crown Chakra",
     title: "963 Hz — Stillness & Unity",
     url: "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Full/963hz.mp3",
-    previewUrl: "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Preview/963hzPreview.mp3",
+    previewUrl:
+      "https://gentle-echo-audio.s3.ca-central-1.amazonaws.com/affirmations/Preview/963hzPreview.mp3",
   },
 ];
 
@@ -113,6 +125,7 @@ const TRACKS_SORTED = [...MUSIC_TRACKS].sort((a, b) => a.hz - b.hz);
 export default function MusicPicker() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
 
   const affirmation: Affirmation | null = useMemo(() => {
     const raw = typeof params.affirmation === "string" ? params.affirmation : "";
@@ -216,7 +229,10 @@ export default function MusicPicker() {
     }
   };
 
-  const onBack = () => router.back();
+  const onBack = async () => {
+    await stopPreview();
+    router.back();
+  };
 
   const onContinue = async () => {
     const selected = TRACKS_SORTED.find((m) => m.id === selectedId) || TRACKS_SORTED[0];
@@ -246,104 +262,156 @@ export default function MusicPicker() {
     router.push(`/(app)/affirmations/review?payload=${payload}`);
   };
 
+  const bottomPad = Math.max(14, insets.bottom + 12);
+  const bottomBarH = 76 + bottomPad;
+
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <Animated.View style={[styles.inner, { opacity: fade, transform: [{ translateY: lift }] }]}>
-          <Text style={styles.header} numberOfLines={1}>
-            Choose Your Background Music
-          </Text>
+    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+      <ImageBackground
+        source={require("../../../assets/images/background_image.png")}
+        style={styles.bg}
+        resizeMode="cover"
+      >
+        <View style={styles.overlayTop} />
+        <View style={styles.overlayBottom} />
 
-          <Text style={styles.sub}>
-            Select a track to play as the background music for your affirmation. Select Preview to hear a sample.
-          </Text>
+        <ScrollView contentContainerStyle={styles.scroll} bounces={false} showsVerticalScrollIndicator={false}>
+          <Animated.View style={[styles.inner, { opacity: fade, transform: [{ translateY: lift }] }]}>
+            <View style={styles.headerTile}>
+              <Text style={styles.header} numberOfLines={1}>
+                Choose the Background Music
+              </Text>
 
-          <View style={styles.panel}>
-            {TRACKS_SORTED.map((m) => {
-              const active = m.id === selectedId;
-              const isPlaying = playingId === m.id;
+              <Text style={styles.sub}>
+                Select a track to play as the background music for your affirmation.   Select Preview to hear a sample.
+              </Text>
+            </View>
 
-              return (
-                <TouchableOpacity
-                  key={m.id}
-                  activeOpacity={0.9}
-                  onPress={() => setSelectedId(m.id)}
-                  style={[styles.rowCard, active && styles.rowCardActive]}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.musicTitle, active && styles.musicTitleActive]}>{m.title}</Text>
-                    <Text style={[styles.musicSub, active && styles.musicSubActive]}>{m.chakra}</Text>
-                  </View>
+            <View style={styles.panel}>
+              {TRACKS_SORTED.map((m) => {
+                const active = m.id === selectedId;
+                const isPlaying = playingId === m.id;
 
+                return (
                   <TouchableOpacity
+                    key={m.id}
                     activeOpacity={0.9}
-                    onPress={() => preview(m)}
-                    style={[styles.previewBtn, isPlaying && styles.previewBtnActive]}
+                    onPress={() => setSelectedId(m.id)}
+                    style={[styles.rowCard, active && styles.rowCardActive]}
                   >
-                    {loadingPlay && isPlaying ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text style={styles.previewText}>{isPlaying ? "Stop" : "Preview"}</Text>
-                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.musicTitle, active && styles.musicTitleActive]}>{m.title}</Text>
+                      <Text style={[styles.musicSub, active && styles.musicSubActive]}>{m.chakra}</Text>
+                    </View>
+
+                    <TouchableOpacity
+                      activeOpacity={0.9}
+                      onPress={() => preview(m)}
+                      style={[styles.previewBtn, isPlaying && styles.previewBtnActive]}
+                    >
+                      {loadingPlay && isPlaying ? (
+                        <ActivityIndicator color="#fff" />
+                      ) : (
+                        <Text style={styles.previewText}>{isPlaying ? "Stop" : "Preview"}</Text>
+                      )}
+                    </TouchableOpacity>
                   </TouchableOpacity>
-                </TouchableOpacity>
-              );
-            })}
+                );
+              })}
+            </View>
+
+            {/* Spacer for floating buttons */}
+            <View style={{ height: bottomBarH + 18 }} />
+          </Animated.View>
+        </ScrollView>
+
+        {/* Floating bottom buttons (safe-area aware) */}
+        <View style={[styles.bottomBar, { paddingBottom: bottomPad }]}>
+          <View style={styles.btnRow}>
+            <TouchableOpacity activeOpacity={0.9} onPress={onBack} style={[styles.btn, styles.btnGhost]}>
+              <Text style={styles.btnText}>Back</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity activeOpacity={0.9} onPress={onContinue} style={[styles.btn, styles.btnPrimary]}>
+              <Text style={styles.btnText}>Select &amp; Continue</Text>
+            </TouchableOpacity>
           </View>
-
-          {/* Space for bottom floating buttons */}
-          <View style={{ height: BOTTOM_BAR_H + 10 }} />
-        </Animated.View>
-      </ScrollView>
-
-      {/* Floating bottom buttons */}
-      <View style={styles.bottomBar}>
-        <View style={styles.btnRow}>
-          <TouchableOpacity activeOpacity={0.9} onPress={onBack} style={[styles.btn, styles.btnGhost]}>
-            <Text style={styles.btnText}>Back</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity activeOpacity={0.9} onPress={onContinue} style={[styles.btn, styles.btnPrimary]}>
-            <Text style={styles.btnText}>Select &amp; Continue</Text>
-          </TouchableOpacity>
         </View>
-      </View>
-    </View>
+      </ImageBackground>
+    </SafeAreaView>
   );
 }
 
+const COLORS = {
+  text: "#F2F0EA",
+  textSoft: "rgba(242,240,234,0.84)",
+  textDim: "rgba(242,240,234,0.70)",
+  border: "rgba(255,255,255,0.14)",
+  panel: "rgba(255,255,255,0.12)",
+  panelBorder: "rgba(255,255,255,0.14)",
+};
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#26384C" },
-  scroll: { padding: 16, paddingBottom: 10 },
-  inner: { paddingTop: 70 },
+  safe: { flex: 1, backgroundColor: "#0B1020" },
+  bg: { flex: 1 },
+
+  overlayTop: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    height: "55%",
+    backgroundColor: "rgba(0,0,0,0.22)",
+  },
+  overlayBottom: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: "65%",
+    backgroundColor: "rgba(0,0,0,0.32)",
+  },
+
+  scroll: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 },
+  inner: { flex: 1 },
+
+  headerTile: {
+    borderRadius: 18,
+    backgroundColor: "rgba(95,200,155,0.30)",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    marginBottom: 12,
+  },
 
   header: {
-    color: "#F2F0EA",
+    color: COLORS.text,
     fontSize: 20.5,
     fontWeight: "900",
     textAlign: "center",
   },
+
   sub: {
     marginTop: 8,
-    color: "rgba(242,240,234,0.70)",
+    color: COLORS.textDim,
     fontSize: 13.5,
     lineHeight: 19,
-    marginBottom: 12,
     textAlign: "center",
   },
 
   panel: {
     borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.12)",
+    backgroundColor: COLORS.panel,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
+    borderColor: COLORS.panelBorder,
     padding: 12,
     gap: 10,
   },
 
   rowCard: {
     borderRadius: 14,
-    backgroundColor: "rgba(0,0,0,0.20)",
+    backgroundColor: "rgba(0,0,0,0.50)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.10)",
     padding: 12,
@@ -353,7 +421,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   rowCardActive: {
-    backgroundColor: "rgba(59,130,246,0.18)",
+    backgroundColor: "rgba(59,130,246,0.30)",
     borderColor: "rgba(59,130,246,0.35)",
   },
 
@@ -397,8 +465,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     paddingHorizontal: 16,
     paddingTop: 10,
-    paddingBottom: 22,
-    backgroundColor: "rgba(38,56,76,0.96)",
+    backgroundColor: "rgba(15,20,35,0.78)",
     borderTopWidth: 1,
     borderTopColor: "rgba(255,255,255,0.12)",
   },
@@ -421,6 +488,9 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     elevation: 12,
   },
-  btnGhost: { backgroundColor: "rgba(0,0,0,0.20)", borderColor: "rgba(255,255,255,0.12)" },
+  btnGhost: {
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderColor: "rgba(255,255,255,0.16)",
+  },
   btnText: { color: "#fff", fontSize: 13.5, fontWeight: "900", letterSpacing: 0.2, textAlign: "center" },
 });

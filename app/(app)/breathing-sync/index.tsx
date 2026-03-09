@@ -1,23 +1,27 @@
 // app/(app)/breathing-sync/index.tsx — FULL REPLACEMENT
 // ✅ 4 breathing patterns as tiles (distinct colors)
 // ✅ Navigates to session with pattern param
-// ✅ Uses DEFAULT system TTS (expo-speech) in session (optional toggle)
+// ✅ Matches your Welcome look: background_image.png + dark overlays + glass tiles + consistent spacing
+// ✅ Safe-area aware + scroll-safe
 
 import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef } from "react";
 import {
   Animated,
+  ImageBackground,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 type PatternId = "box" | "478" | "calm" | "reset";
 
 export default function BreathingSyncIndex() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const fade = useRef(new Animated.Value(0)).current;
   const lift = useRef(new Animated.Value(8)).current;
@@ -37,83 +41,117 @@ export default function BreathingSyncIndex() {
           title: "BOX BREATHING",
           description:
             "Balances your nervous system. Great for focus and regaining control quickly.",
-          color: "#2F4A73",
+          color: "rgba(47,74,115,0.60)",
         },
         {
           id: "478" as const,
           title: "BEDTIME BREATHING",
           description:
             "Downshifts your body fast. Calm racing thoughts and ease into sleep.",
-          color: "#4B3F72",
+          color: "rgba(75,63,114,0.60)",
         },
         {
           id: "calm" as const,
           title: "CALM FLOW",
-          description:
-            "Smooth and simple. A gentle rhythm to reduce tension.",
-          color: "#2E6A78",
+          description: "Smooth and simple. A gentle rhythm to reduce tension.",
+          color: "rgba(46,106,120,0.60)",
         },
         {
           id: "reset" as const,
           title: "RESET BREATH",
           description:
             "A deeper reset. Helps release stress while keeping a grounded pace.",
-          color: "#4B6B3D",
+          color: "rgba(75,107,61,0.60)",
         },
       ] as const,
     []
   );
 
   const go = (id: PatternId) => {
-    router.push(`/breathing-sync/session?pattern=${id}` as any);
+    router.push(`/(app)/breathing-sync/session?pattern=${id}` as any);
   };
 
+  const bottomPad = Math.max(18, insets.bottom + 14);
+
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll} bounces={false}>
-        <Animated.View style={{ opacity: fade, transform: [{ translateY: lift }] }}>
-          <Text style={styles.title}>BREATH-SYNC</Text>
-          <Text style={styles.sub}>
-            Choose a breating pattern
-          </Text>
+    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+      <ImageBackground
+        source={require("../../../assets/images/background_image.png")}
+        style={styles.bg}
+        resizeMode="cover"
+      >
+        {/* Match Welcome-style dim overlays */}
+        <View style={styles.overlayTop} />
+        <View style={styles.overlayBottom} />
 
-          <View style={{ height: 18 }} />
+        <ScrollView
+          contentContainerStyle={[styles.scroll, { paddingBottom: bottomPad + 16 }]}
+          bounces={false}
+          showsVerticalScrollIndicator={false}
+        >
+          <Animated.View style={[styles.inner, { opacity: fade, transform: [{ translateY: lift }] }]}>
+            <Text style={styles.title}>BREATH-SYNC</Text>
+            <Text style={styles.sub}>Choose a breathing pattern</Text>
 
-          {patterns.map((p) => (
-            <View key={p.id} style={[styles.card, { backgroundColor: p.color }]}>
-              <Text style={styles.cardTitle}>{p.title}</Text>
-              <Text style={styles.cardDesc}>{p.description}</Text>
+            <View style={{ height: 18 }} />
 
-              <View style={{ height: 12 }} />
+            {patterns.map((p) => (
+              <View key={p.id} style={[styles.card, { backgroundColor: p.color }]}>
+                <Text style={styles.cardTitle}>{p.title}</Text>
 
-              <TouchableOpacity
-                activeOpacity={0.9}
-                onPress={() => go(p.id)}
-                style={styles.selectBtn}
-              >
-                <Text style={styles.selectText}>SELECT</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
+                <View style={styles.cardRow}>
+                  <Text style={styles.cardDesc}>{p.description}</Text>
 
-          <View style={{ height: 24 }} />
-        </Animated.View>
-      </ScrollView>
-    </View>
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => go(p.id)}
+                    style={styles.selectBtn}
+                  >
+                    <Text style={styles.selectText}>SELECT</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+
+            <View style={{ height: 10 }} />
+          </Animated.View>
+        </ScrollView>
+      </ImageBackground>
+    </SafeAreaView>
   );
 }
 
 const COLORS = {
-  bg: "#1F2543",
   text: "#F2F0EA",
   textDim: "rgba(242,240,234,0.74)",
-  btnBg: "rgba(255,255,255,0.18)",
-  btnBorder: "rgba(255,255,255,0.25)",
+  border: "rgba(255,255,255,0.14)",
+  btnBg: "rgba(255,255,255,0.16)",
+  btnBorder: "rgba(255,255,255,0.18)",
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg },
-  scroll: { padding: 16, paddingBottom: 40 },
+  safe: { flex: 1, backgroundColor: "#0B1020" },
+  bg: { flex: 1 },
+
+  overlayTop: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    height: "55%",
+    backgroundColor: "rgba(0,0,0,0.22)",
+  },
+  overlayBottom: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: "65%",
+    backgroundColor: "rgba(0,0,0,0.32)",
+  },
+
+  scroll: { padding: 16 },
+  inner: { paddingTop: 10 },
 
   title: {
     color: COLORS.text,
@@ -122,6 +160,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 14,
     marginBottom: 10,
+    letterSpacing: 0.2,
   },
   sub: {
     color: COLORS.textDim,
@@ -133,28 +172,37 @@ const styles = StyleSheet.create({
 
   card: {
     borderRadius: 18,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     padding: 16,
     marginBottom: 14,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.16)",
   },
   cardTitle: {
     color: COLORS.text,
     fontSize: 15,
     fontWeight: "900",
-    letterSpacing: 0.4,
-    marginBottom: 10,
+    letterSpacing: 0.6,
+    marginBottom: 12,
     textAlign: "center",
   },
+
+  cardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+
   cardDesc: {
-    color: "rgba(242,240,234,0.9)",
+    flex: 0.6,
+    color: "rgba(242,240,234,0.86)",
     fontSize: 13.5,
     lineHeight: 19,
     textAlign: "center",
   },
 
   selectBtn: {
-    height: 46,
+    flex: 0.4,
+    height: 44,
     borderRadius: 12,
     backgroundColor: COLORS.btnBg,
     borderWidth: 1,

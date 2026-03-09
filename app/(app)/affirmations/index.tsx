@@ -1,44 +1,57 @@
 // app/(app)/affirmations/index.tsx — FULL REPLACEMENT
-// ✅ Center title + centered paragraphs
-// ✅ Text sits inside a background tile
-// ✅ Adds spacing between specific paragraphs + step lines
-// ✅ Steps are LEFT-justified AND wrap-align under the step text (not under the number)
-// ✅ Library button is a different blue than Create button
+// ✅ Uses global AppScreen (background + safe-area + padding + scroll)
+// ✅ Uses global AppButton for consistent buttons
+// ✅ Keeps your existing content + step wrap alignment
 
 import { useRouter } from "expo-router";
 import React from "react";
-import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import AppButton from "../../../components/AppButton";
+import AppScreen from "../../../components/AppScreen";
 
 export default function AffirmationsHome() {
   const router = useRouter();
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.inner}>
+    <AppScreen scroll>
+      <View style={styles.block}>
         <Text style={styles.title}>AFFIRMATIONS</Text>
 
         {/* Background tile behind ALL text */}
         <View style={styles.textTile}>
-          <Text style={styles.subCenter}>This app allows you to create personalized affirmations</Text>
+          <Text style={styles.subCenter}>
+            This app allows you to create personalized affirmations
+          </Text>
 
           <View style={styles.spacerLg} />
 
           <Text style={styles.subCenter}>
-            Each affirmation blends a carefully written script with a subtle background frequency to encourage the mind
-            to engage more deeply with the message
+            Each affirmation blends a carefully written script with a background frequency
+            to encourage the mind to engage more deeply with the message
           </Text>
 
           <View style={styles.spacerLg} />
+
+          <Text style={styles.subCenter}>
+            Creating an affirmation takes just three easy steps:
+          </Text>
+
           <View style={styles.spacerLg} />
 
-          <Text style={styles.subCenter}>Creating an affirmation takes just a couple of simple steps:</Text>
-
-          <View style={styles.spacerLg} />
-
-          {/* ✅ Proper step alignment (wrapped lines align under text, not the number) */}
           <View style={styles.stepRow}>
             <Text style={styles.stepNumber}>1.</Text>
-            <Text style={styles.stepText}>Select an affirmation script from the catalogue</Text>
+            <Text style={styles.stepText}>
+              Select the CREATE AN AFFIRMATION button below
+            </Text>
+          </View>
+
+          <View style={styles.spacerLg} />
+
+          <View style={styles.stepRow}>
+            <Text style={styles.stepNumber}>2.</Text>
+            <Text style={styles.stepText}>
+              Select an affirmation script from the catalogue page
+            </Text>
           </View>
 
           <View style={styles.spacerSm} />
@@ -46,7 +59,7 @@ export default function AffirmationsHome() {
           <View style={styles.stepRow}>
             <Text style={styles.stepNumber}>2.</Text>
             <Text style={styles.stepText}>
-              Choose the desired background music from the catalogue of chakra frequencies
+              Select the desired background music from the catalogue of chakra frequencies
             </Text>
           </View>
 
@@ -54,34 +67,34 @@ export default function AffirmationsHome() {
           <View style={styles.spacerLg} />
 
           <Text style={styles.subCenter}>
-            That's all. Your affirmation will be automatically generated and saved to your personal affirmation library,
-            ready to listen to at anytime
+            That's all. Your affirmation will be automatically generated and saved to your personal
+            affirmation library and ready for you to listen to at anytime
           </Text>
         </View>
 
-        <TouchableOpacity
-          activeOpacity={0.9}
+        <AppButton
+          title="Create an Affirmation"
           onPress={() => router.push("/(app)/affirmations/create")}
-          style={styles.btnPrimary}
-        >
-          <Text style={styles.btnText}>Create an Affirmation</Text>
-        </TouchableOpacity>
+          variant="primary"
+          style={{ marginTop: 14 }}
+        />
 
-        <TouchableOpacity
-          activeOpacity={0.9}
+        <AppButton
+          title="Go To My Affirmation Library"
           onPress={() => router.push("/(app)/affirmations/library")}
-          style={styles.btnSecondary}
-        >
-          <Text style={styles.btnText}>Go To My Affirmation Library</Text>
-        </TouchableOpacity>
+          variant="secondary"
+          style={{ marginTop: 12 }}
+        />
       </View>
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#26384C" },
-  inner: { flex: 1, paddingTop: 70, paddingHorizontal: 18, gap: 14 },
+  block: {
+    paddingTop: 6,
+    gap: 14,
+  },
 
   title: {
     color: "#F2F0EA",
@@ -89,74 +102,45 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     textAlign: "center",
     letterSpacing: 0.2,
+    marginTop: 6,
   },
 
-  // Tile behind ALL text
   textTile: {
-    borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 18,
+    backgroundColor: "rgba(19,167,154,0.70)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
+    borderColor: "rgba(255,255,255,0.16)",
     padding: 16,
   },
 
   subCenter: {
-    color: "#FFFFFF",
+    color: "rgba(242,240,234,0.88)",
     fontSize: 14,
     lineHeight: 20,
     textAlign: "center",
-    fontWeight: "600",
+    fontWeight: "700",
   },
 
   spacerLg: { height: 14 },
-  spacerSm: { height: 8 },
+  spacerSm: { height: 10 },
 
-  // ✅ Numbered steps that wrap correctly
   stepRow: {
     flexDirection: "row",
     alignItems: "flex-start",
   },
   stepNumber: {
-    width: 24, // controls indent; increase to 26/28 if you want more gap
-    color: "#FFFFFF",
+    width: 24,
+    color: "rgba(242,240,234,0.92)",
     fontSize: 14,
     lineHeight: 20,
-    fontWeight: "700",
+    fontWeight: "900",
   },
   stepText: {
     flex: 1,
-    color: "#FFFFFF",
+    color: "rgba(242,240,234,0.88)",
     fontSize: 14,
     lineHeight: 20,
-    fontWeight: "600",
+    fontWeight: "700",
     textAlign: "left",
-  },
-
-  btnPrimary: {
-    height: 62,
-    borderRadius: 16,
-    backgroundColor: "rgba(59,130,246,0.78)", // Create button blue
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-  },
-
-  btnSecondary: {
-    height: 62,
-    borderRadius: 16,
-    backgroundColor: "rgba(37,99,235,0.80)", // Different blue for Library
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-  },
-
-  btnText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "900",
-    letterSpacing: 0.2,
-    textAlign: "center",
   },
 });

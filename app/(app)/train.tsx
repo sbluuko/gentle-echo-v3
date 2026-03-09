@@ -1,11 +1,11 @@
-// app/(app)/train.tsx — FULL REPLACEMENT (SCROLL + FIXED FOOTER PATTERN)
-// ✅ Content scrolls if needed (small Android screens)
-// ✅ Bottom buttons live in a fixed footer and never go off-screen
-// ✅ SafeArea correct on iOS + Android (footer respects insets.bottom)
-// ✅ No absolute positioning hacks
-// ✅ Keeps your existing boot guard + training flow + success modal
+// app/(app)/train.tsx — FULL REPLACEMENT
+// ✅ Fixes iPhone false "must be at least 30 seconds" issue
+// ✅ Uses real elapsed time instead of trusting final iPhone recording metadata
+// ✅ Keeps your scroll + fixed footer layout
+// ✅ Keeps boot guard + success modal
+// ✅ Safely switches audio mode between record and playback
 
-import { Audio } from "expo-av";
+import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -31,7 +31,7 @@ const MIN_SECONDS = 30;
 const MAX_SECONDS = 90;
 
 // Footer sizing (used to pad ScrollView content so it won't hide behind footer)
-const FOOTER_BASE_HEIGHT = 112; // buttons + padding (approx)
+const FOOTER_BASE_HEIGHT = 112;
 
 export default function Train() {
   const router = useRouter();
@@ -39,7 +39,10 @@ export default function Train() {
 
   const recordingRef = useRef<Audio.Recording | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
-  const durationIntervalRef = useRef<any>(null);
+  const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ✅ Real elapsed-time tracking for iPhone reliability
+  const recordingStartedAtRef = useRef<number | null>(null);
 
   const fade = useRef(new Animated.Value(0)).current;
   const lift = useRef(new Animated.Value(8)).current;
@@ -63,15 +66,43 @@ export default function Train() {
     ]).start();
 
     return () => {
-      if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+        durationIntervalRef.current = null;
+      }
+
       safeUnloadSound();
-      // If a recording is active and component unmounts, avoid leaving it hanging.
+
       try {
         recordingRef.current?.stopAndUnloadAsync?.().catch(() => {});
       } catch {}
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const setPlaybackMode = async () => {
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: false,
+      interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+      shouldDuckAndroid: true,
+      interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+      playThroughEarpieceAndroid: false,
+    });
+  };
+
+  const setRecordingMode = async () => {
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: true,
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: false,
+      interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+      shouldDuckAndroid: true,
+      interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+      playThroughEarpieceAndroid: false,
+    });
+  };
 
   const safeUnloadSound = async () => {
     try {
@@ -94,7 +125,9 @@ export default function Train() {
 
         const { data: authData, error: authErr } = await supabase.auth.getUser();
         if (authErr || !authData?.user?.id) {
-          if (!cancelled) Alert.alert("Not logged in", "Please sign in again.");
+          if (!cancelled) {
+            Alert.alert("Not logged in", "Please sign in again.");
+          }
           return;
         }
 
@@ -110,7 +143,6 @@ export default function Train() {
 
         if (cancelled) return;
 
-        // ✅ Redirect trained users to home
         if (!profErr && profile?.voice_ready === true && profile?.voice_id) {
           router.replace("/(app)/welcome");
           return;
@@ -131,13 +163,11 @@ export default function Train() {
       [
         "I’m recording this script one time only to let Gentle Echo learn the natural sound of my voice so my reflections play back in a fully personalized message.",
         "",
-        "There’s no need to speak perfectly. If I pause, repeat myself, or stumble over a word or two, that’s completely fine. Natural speech actually helps create a better voice match. I can also re-record my message before sending.",
+        "There’s no need to speak perfectly. If I pause, repeat myself, or stumble over a word or two, that’s completely fine. Just keep on reading as natural speech actually helps create a better voice match.",
         "",
-        "I just need to make sure the recording is at least 45 seconds in length.",
+        "My voice clone will be kept private and used only for my own reflections. I can delete my voice clone at any time.",
         "",
-        "My voice clone will be kept private and used only for my own reflections. I can easily delete my profile at any time.",
-        "",
-        "Gentle Echo is where I can freely express my thoughts and receive a meesage of clarity in return. When stress hijacks my thinking, I can talk it out, clear my head and regain clarity.",
+        "Gentle Echo is where I can freely express my thoughts and receive a message of clarity in return. When stress hijacks my thinking, I can talk it out, clear my head and regain clarity.",
         "",
         "I give my consent for Gentle Echo to create and securely store a private voice identifier for generating audio in my voice.",
       ].join("\n"),
@@ -148,14 +178,25 @@ export default function Train() {
     await safeUnloadSound();
     setRecordingUri(null);
     setDurationSec(0);
+    recordingStartedAtRef.current = null;
+  };
+
+  const getElapsedRecordingSeconds = () => {
+    const startedAt = recordingStartedAtRef.current;
+    if (!startedAt) return 0;
+    return Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
   };
 
   const updateDurationTimer = async () => {
+    // ✅ Use wall-clock elapsed time as primary truth
+    const elapsedSec = getElapsedRecordingSeconds();
+    setDurationSec(elapsedSec);
+
+    // Optional secondary check from Expo status, but do not trust it as primary
     try {
       const rec = recordingRef.current;
       if (!rec) return;
-      const status: any = await rec.getStatusAsync();
-      setDurationSec(Math.floor((status?.durationMillis ?? 0) / 1000));
+      await rec.getStatusAsync();
     } catch {}
   };
 
@@ -172,16 +213,18 @@ export default function Train() {
         return;
       }
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
+      await safeUnloadSound();
+      await setRecordingMode();
 
       const rec = new Audio.Recording();
       await rec.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
       await rec.startAsync();
 
       recordingRef.current = rec;
+
+      // ✅ Start elapsed-time clock only AFTER recording actually starts
+      recordingStartedAtRef.current = Date.now();
+      setDurationSec(0);
       setIsRecording(true);
 
       durationIntervalRef.current = setInterval(updateDurationTimer, 250);
@@ -189,6 +232,12 @@ export default function Train() {
       Alert.alert("Recording error", String(e?.message ?? e));
       setIsRecording(false);
       recordingRef.current = null;
+      recordingStartedAtRef.current = null;
+      setDurationSec(0);
+
+      try {
+        await setPlaybackMode();
+      } catch {}
     } finally {
       setBusy(false);
     }
@@ -199,27 +248,47 @@ export default function Train() {
 
     try {
       setBusy(true);
-      if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
+
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+        durationIntervalRef.current = null;
+      }
 
       const rec = recordingRef.current;
       if (!rec) return;
 
+      // ✅ Primary duration truth = real elapsed clock before stop clears things
+      const elapsedSec = getElapsedRecordingSeconds();
+
       await rec.stopAndUnloadAsync();
+
+      // Small iPhone settle delay
+      await new Promise((resolve) => setTimeout(resolve, 350));
+
       const uri = rec.getURI();
-      const status: any = await rec.getStatusAsync();
+
+      let statusDurationSec = 0;
+      try {
+        const status: any = await rec.getStatusAsync();
+        statusDurationSec = Math.floor((status?.durationMillis ?? 0) / 1000);
+      } catch {}
 
       recordingRef.current = null;
       setIsRecording(false);
 
-      const secs = Math.floor((status?.durationMillis ?? 0) / 1000);
-      setDurationSec(secs);
+      // ✅ Use the larger of elapsed clock or Expo-reported duration
+      const finalSec = Math.max(elapsedSec, statusDurationSec);
+      setDurationSec(finalSec);
 
-      if (secs < MIN_SECONDS) {
+      await setPlaybackMode();
+
+      if (finalSec < MIN_SECONDS) {
         await clearRecordingState();
         Alert.alert("Recording too short", `Please record at least ${MIN_SECONDS} seconds.`);
         return;
       }
-      if (secs > MAX_SECONDS) {
+
+      if (finalSec > MAX_SECONDS) {
         await clearRecordingState();
         Alert.alert(
           "Recording too long",
@@ -231,6 +300,9 @@ export default function Train() {
       setRecordingUri(uri ?? null);
     } catch (e: any) {
       Alert.alert("Stop error", String(e?.message ?? e));
+      try {
+        await setPlaybackMode();
+      } catch {}
     } finally {
       setBusy(false);
     }
@@ -242,16 +314,13 @@ export default function Train() {
     try {
       setBusy(true);
       await safeUnloadSound();
-
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-      });
+      await setPlaybackMode();
 
       const { sound } = await Audio.Sound.createAsync(
         { uri: recordingUri },
         { shouldPlay: true }
       );
+
       soundRef.current = sound;
 
       sound.setOnPlaybackStatusUpdate((st: any) => {
@@ -309,7 +378,10 @@ export default function Train() {
         .from("profiles")
         .update(updatePayload)
         .eq("id", userId);
-      if (updErr) throw new Error(`Profile update failed: ${updErr.message}`);
+
+      if (updErr) {
+        throw new Error(`Profile update failed: ${updErr.message}`);
+      }
 
       setShowSuccessModal(true);
     } catch (e: any) {
@@ -329,7 +401,6 @@ export default function Train() {
   const listenDisabled = disableAll || isRecording || !recordingUri;
   const createDisabled = disableAll || isRecording || !readyToCreate;
 
-  // Scroll content padding so it will never hide behind footer
   const footerHeight = FOOTER_BASE_HEIGHT + insets.bottom;
 
   return (
@@ -339,21 +410,19 @@ export default function Train() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 16 : 0}
       >
-        {/* ✅ Screen layout: Scrollable content + Fixed footer (no absolute positioning) */}
         <Animated.View style={[styles.screen, { opacity: fade, transform: [{ translateY: lift }] }]}>
           <ScrollView
             style={styles.scroll}
             contentContainerStyle={[
               styles.scrollContent,
               {
-                paddingTop: 48, // your "lowered top" requirement (~0.5 inch)
+                paddingTop: 48,
                 paddingBottom: footerHeight + 12,
               },
             ]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {/* Script */}
             <View style={styles.card}>
               <Text style={styles.cardBody}>{scriptText}</Text>
             </View>
@@ -366,15 +435,12 @@ export default function Train() {
                 : `Duration: ${durationSec}s`}
             </Text>
 
-            {/* Optional helper line */}
             <Text style={styles.hintText}>
               Record between {MIN_SECONDS}-{MAX_SECONDS} seconds, then create your voice.
             </Text>
           </ScrollView>
 
-          {/* ✅ Fixed Footer (buttons never go off-screen) */}
           <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-            {/* Row 1: Record + Stop */}
             <View style={styles.footerRow}>
               <TouchableOpacity
                 activeOpacity={0.9}
@@ -395,7 +461,6 @@ export default function Train() {
               </TouchableOpacity>
             </View>
 
-            {/* Row 2: Listen + Create Voice */}
             <View style={styles.footerRow}>
               <TouchableOpacity
                 activeOpacity={0.9}
@@ -417,7 +482,6 @@ export default function Train() {
             </View>
           </View>
 
-          {/* ✅ Success modal */}
           <Modal visible={showSuccessModal} transparent animationType="fade" onRequestClose={() => {}}>
             <View style={styles.modalOverlay}>
               <View style={styles.modalCard}>
@@ -495,7 +559,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Footer
   footer: {
     paddingHorizontal: 16,
     paddingTop: 10,
@@ -549,7 +612,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.45)",

@@ -1,26 +1,24 @@
 // app/(app)/breathing-sync/session.tsx — FULL REPLACEMENT
-// ✅ Subtitle (step text) is CENTERED + BOLD (one instruction per line)
-// ✅ Circle is 20% smaller
-// ✅ Progress ring keeps restarting every phase (fixes “went once then stopped”)
-// ✅ NO “centered between tile and buttons” restriction — circle + controls can move freely
-// ✅ Buttons can be moved higher (no layout rule blocking it)
-// ✅ Voice Guidance: TWO separate buttons side-by-side (ON / OFF)
-// ✅ Voice can speak: “Starting in 3,2,1… Begin” + first instruction
-// ✅ Voice can also speak countdown (3,2,1) at the END of each phase (optional behavior included)
+// ✅ Keeps STACK header back button (default iOS/Android back)
+// ✅ Removes ONLY the custom in-screen Back button (the one you had in the header row)
+// ✅ Matches Welcome look: background_image.png + dark overlays + glass tiles
+// ✅ Safe-area aware spacing (top + bottom) so iPhone/Android behave the same
 
 import { Audio } from "expo-av";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams } from "expo-router";
 import * as Speech from "expo-speech";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Animated,
+  ImageBackground,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
 
 type PatternId = "box" | "478" | "calm" | "reset";
@@ -41,7 +39,7 @@ const PATTERNS: Record<PatternId, Pattern> = {
   box: {
     id: "box",
     name: "Box Breathing",
-    subtitle: "4 Second Inhale\n4 Second Hold\n4 Second Exhale\n4 Second Hold",
+    subtitle: "4 Second Inhale    4 Second Hold\n4 Second Exhale    4 Second Hold",
     inhale: 4,
     hold1: 4,
     exhale: 4,
@@ -50,7 +48,7 @@ const PATTERNS: Record<PatternId, Pattern> = {
   "478": {
     id: "478",
     name: "4–7–8 Breathing",
-    subtitle: "4 Second Inhale\n7 Second Hold\n8 Second Exhale\n0 Second Hold",
+    subtitle: "4 Second Inhale    7 Second Hold\n8 Second Exhale    0 Second Hold",
     inhale: 4,
     hold1: 7,
     exhale: 8,
@@ -59,7 +57,7 @@ const PATTERNS: Record<PatternId, Pattern> = {
   calm: {
     id: "calm",
     name: "Calm Flow",
-    subtitle: "5 Second Inhale\n0 Second Hold\n5 Second Exhale\n0 Second Hold",
+    subtitle: "5 Second Inhale    0 Second Hold\n5 Second Exhale    0 Second Hold",
     inhale: 5,
     hold1: 0,
     exhale: 5,
@@ -68,7 +66,7 @@ const PATTERNS: Record<PatternId, Pattern> = {
   reset: {
     id: "reset",
     name: "Reset Breath",
-    subtitle: "6 Second Inhale\n2 Second Hold\n6 Second Exhale\n0 Second Hold",
+    subtitle: "6 Second Inhale    2 Second Hold\n6 Second Exhale    0 Second Hold",
     inhale: 6,
     hold1: 2,
     exhale: 6,
@@ -90,8 +88,8 @@ function clamp(n: number, min: number, max: number) {
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 export default function BreathingSyncSession() {
-  const router = useRouter();
   const params = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
 
   const patternId = (params?.pattern as PatternId) || "box";
   const pattern = PATTERNS[patternId] ?? PATTERNS.box;
@@ -115,7 +113,7 @@ export default function BreathingSyncSession() {
   const [prepping, setPrepping] = useState(false);
   const [prepCount, setPrepCount] = useState(3);
 
-  // Keep “live” flags for timers (prevents stale state inside setInterval)
+  // Keep “live” flags for timers
   const runningRef = useRef(false);
   const pausedRef = useRef(false);
   const preppingRef = useRef(false);
@@ -219,7 +217,11 @@ export default function BreathingSyncSession() {
         : (scale as any).__getValue?.() ?? 0.96;
 
     Animated.timing(scale, { toValue: to, duration: 650, useNativeDriver: true }).start();
-    Animated.timing(glow, { toValue: k === "inhale" ? 1 : k === "exhale" ? 0.2 : 0.6, duration: 650, useNativeDriver: false }).start();
+    Animated.timing(glow, {
+      toValue: k === "inhale" ? 1 : k === "exhale" ? 0.2 : 0.6,
+      duration: 650,
+      useNativeDriver: false,
+    }).start();
   };
 
   const setPhaseAndCount = (k: PhaseKey, seconds: number) => {
@@ -378,7 +380,6 @@ export default function BreathingSyncSession() {
     preppingRef.current = true;
 
     setPrepCount(3);
-
     startRingForSeconds(3);
 
     if (voiceOn) {
@@ -418,6 +419,8 @@ export default function BreathingSyncSession() {
       setPrepCount(c);
 
       if (voiceOn) {
+        if (c === 4) speak("Four", true);
+        if (c === 3) speak("Three", true);
         if (c === 2) speak("Two", true);
         if (c === 1) speak("One", true);
       }
@@ -490,15 +493,14 @@ export default function BreathingSyncSession() {
 
   const circleGlow = glow.interpolate({
     inputRange: [0, 1],
-    outputRange: ["rgba(255,255,255,0.08)", "rgba(255,255,255,0.18)"],
+    outputRange: ["rgba(100,255,255,0.08)", "rgba(255,255,255,0.18)"],
   });
 
   const shownCount = prepping ? prepCount : count;
   const shownLabel = prepping ? "GET READY" : PHASE_LABELS[phase];
 
-  // ✅ Circle is 20% smaller
-  const OUTER_SIZE = 224; // was 280
-  const INNER_SIZE = 176; // was 220
+  const OUTER_SIZE = 224;
+  const INNER_SIZE = 176;
   const STROKE = 4;
 
   const R = OUTER_SIZE / 2 - STROKE;
@@ -509,160 +511,169 @@ export default function BreathingSyncSession() {
     outputRange: [CIRC, 0],
   });
 
+  const bottomPad = Math.max(18, insets.bottom + 14);
+
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity activeOpacity={0.85} onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backText}>Back</Text>
-        </TouchableOpacity>
+    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+      {/* ✅ KEEP stack header back button */}
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          title: "Breathing Sync",
+          headerBackTitle: "Back",
+          headerTintColor: "#F2F0EA",
+          headerStyle: { backgroundColor: "#26384C" },
+          headerTitleStyle: { fontWeight: "900" },
+          headerShadowVisible: false,
+        }}
+      />
 
-        <View style={{ flex: 1 }}>
-          <Text style={styles.title}>{pattern.name}</Text>
+      <ImageBackground
+        source={require("../../../assets/images/background_image.png")}
+        style={styles.bg}
+        resizeMode="cover"
+      >
+        <View style={styles.overlayTop} />
+        <View style={styles.overlayBottom} />
 
-          <View style={{ height: 18 }} />
+        <View style={[styles.container, { paddingBottom: bottomPad }]}>
+          {/* NO custom back button here */}
+          <View style={styles.headerArea}>
+            <Text style={styles.title}>{pattern.name}</Text>
+            <View style={{ height: 10 }} />
+            <Text style={styles.sub}>{pattern.subtitle}</Text>
+          </View>
 
-          <Text style={styles.sub}>{pattern.subtitle}</Text>
-        </View>
+          <View style={styles.optionsTile}>
+            <View style={styles.optionsRow}>
+              <Text style={styles.optionLabel}>Voice Guidance</Text>
 
-        <View style={{ width: 70 }} />
-      </View>
+              <View style={styles.voiceToggleWrap}>
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  onPress={() => setVoice(true)}
+                  style={[styles.voiceBtn, voiceOn ? styles.voiceBtnOn : styles.voiceBtnOff]}
+                >
+                  <Text style={styles.voiceBtnText}>ON</Text>
+                </TouchableOpacity>
 
-      <View style={{ height: 18 }} />
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  onPress={() => setVoice(false)}
+                  style={[styles.voiceBtn, !voiceOn ? styles.voiceBtnOn : styles.voiceBtnOff]}
+                >
+                  <Text style={styles.voiceBtnText}>OFF</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
 
-      {/* Options tile */}
-      <View style={styles.optionsTile}>
-        <View style={styles.optionsRow}>
-          <Text style={styles.optionLabel}>Voice Guidance</Text>
+            <View style={{ height: 18 }} />
 
-          {/* ✅ Separate ON / OFF buttons */}
-          <View style={styles.voiceToggleWrap}>
+            <Text style={styles.optionLabel}>Background Sound</Text>
+            <View style={{ height: 12 }} />
+
+            <View style={styles.bgRow}>
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => onSetBgMode("music")}
+                style={[styles.bgBtn, bgMode === "music" && styles.bgBtnActive]}
+              >
+                <Text style={styles.bgText}>Music</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => onSetBgMode("noise")}
+                style={[styles.bgBtn, bgMode === "noise" && styles.bgBtnActive]}
+              >
+                <Text style={styles.bgText}>Noise</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => onSetBgMode("none")}
+                style={[styles.bgBtn, bgMode === "none" && styles.bgBtnActive]}
+              >
+                <Text style={styles.bgText}>None</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.center}>
+            <Animated.View style={[styles.circleOuter, { backgroundColor: circleGlow }]}>
+              <View style={styles.ringWrap} pointerEvents="none">
+                <Svg width={OUTER_SIZE} height={OUTER_SIZE}>
+                  <Circle
+                    cx={OUTER_SIZE / 2}
+                    cy={OUTER_SIZE / 2}
+                    r={R}
+                    stroke="rgba(255,255,255,0.18)"
+                    strokeWidth={STROKE}
+                    fill="transparent"
+                  />
+                  <AnimatedCircle
+                    cx={OUTER_SIZE / 2}
+                    cy={OUTER_SIZE / 2}
+                    r={R}
+                    stroke="rgba(242,240,234,0.92)"
+                    strokeWidth={STROKE}
+                    fill="transparent"
+                    strokeLinecap="round"
+                    strokeDasharray={`${CIRC} ${CIRC}`}
+                    strokeDashoffset={dashOffset as any}
+                    rotation={-90}
+                    originX={OUTER_SIZE / 2}
+                    originY={OUTER_SIZE / 2}
+                  />
+                </Svg>
+              </View>
+
+              <Animated.View style={[styles.circleInner, { transform: [{ scale }] }]}>
+                <Text style={styles.phaseText}>{shownLabel}</Text>
+                <Text style={styles.countText}>{String(clamp(shownCount, 0, 99))}</Text>
+              </Animated.View>
+            </Animated.View>
+
+            {!bgReady ? (
+              <View style={styles.audioLoading}>
+                <ActivityIndicator />
+                <Text style={styles.audioLoadingText}>Preparing audio…</Text>
+              </View>
+            ) : null}
+          </View>
+
+          <View style={styles.controls}>
             <TouchableOpacity
               activeOpacity={0.9}
-              onPress={() => setVoice(true)}
-              style={[styles.voiceBtn, voiceOn ? styles.voiceBtnOn : styles.voiceBtnOff]}
+              onPress={onStart}
+              disabled={!bgReady}
+              style={[styles.btn, styles.btnStart, !bgReady && styles.disabled]}
             >
-              <Text style={styles.voiceBtnText}>ON</Text>
+              <Text style={styles.btnText}>
+                {!running ? "Start" : paused ? "Resume" : prepping ? "Starting…" : "Running…"}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               activeOpacity={0.9}
-              onPress={() => setVoice(false)}
-              style={[styles.voiceBtn, !voiceOn ? styles.voiceBtnOn : styles.voiceBtnOff]}
+              onPress={onPause}
+              disabled={!running || paused || prepping}
+              style={[styles.btn, styles.btnPause, (!running || paused || prepping) && styles.disabled]}
             >
-              <Text style={styles.voiceBtnText}>OFF</Text>
+              <Text style={styles.btnText}>Pause</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity activeOpacity={0.9} onPress={hardReset} style={[styles.btn, styles.btnReset]}>
+              <Text style={styles.btnText}>Reset</Text>
             </TouchableOpacity>
           </View>
         </View>
-
-        <View style={{ height: 30 }} />
-
-        <Text style={styles.optionLabel}>Background Sound</Text>
-        <View style={{ height: 15 }} />
-
-        <View style={styles.bgRow}>
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={() => onSetBgMode("music")}
-            style={[styles.bgBtn, bgMode === "music" && styles.bgBtnActive]}
-          >
-            <Text style={styles.bgText}>Music</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={() => onSetBgMode("noise")}
-            style={[styles.bgBtn, bgMode === "noise" && styles.bgBtnActive]}
-          >
-            <Text style={styles.bgText}>Noise</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={() => onSetBgMode("none")}
-            style={[styles.bgBtn, bgMode === "none" && styles.bgBtnActive]}
-          >
-            <Text style={styles.bgText}>None</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Circle (no “centered between tile and buttons” rule) */}
-      <View style={styles.center}>
-        <Animated.View style={[styles.circleOuter, { backgroundColor: circleGlow }]}>
-          <View style={styles.ringWrap} pointerEvents="none">
-            <Svg width={OUTER_SIZE} height={OUTER_SIZE}>
-              <Circle
-                cx={OUTER_SIZE / 2}
-                cy={OUTER_SIZE / 2}
-                r={R}
-                stroke="rgba(255,255,255,0.18)"
-                strokeWidth={STROKE}
-                fill="transparent"
-              />
-              <AnimatedCircle
-                cx={OUTER_SIZE / 2}
-                cy={OUTER_SIZE / 2}
-                r={R}
-                stroke="rgba(242,240,234,0.92)"
-                strokeWidth={STROKE}
-                fill="transparent"
-                strokeLinecap="round"
-                strokeDasharray={`${CIRC} ${CIRC}`}
-                strokeDashoffset={dashOffset as any}
-                rotation={-90}
-                originX={OUTER_SIZE / 2}
-                originY={OUTER_SIZE / 2}
-              />
-            </Svg>
-          </View>
-
-          <Animated.View style={[styles.circleInner, { transform: [{ scale }] }]}>
-            <Text style={styles.phaseText}>{shownLabel}</Text>
-            <Text style={styles.countText}>{String(clamp(shownCount, 0, 99))}</Text>
-          </Animated.View>
-        </Animated.View>
-
-        {!bgReady ? (
-          <View style={styles.audioLoading}>
-            <ActivityIndicator />
-            <Text style={styles.audioLoadingText}>Preparing audio…</Text>
-          </View>
-        ) : null}
-      </View>
-
-      {/* Controls (NO restriction preventing moving higher) */}
-      <View style={styles.controls}>
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={onStart}
-          disabled={!bgReady}
-          style={[styles.btn, styles.btnStart, !bgReady && styles.disabled]}
-        >
-          <Text style={styles.btnText}>
-            {!running ? "Start" : paused ? "Resume" : prepping ? "Starting…" : "Running…"}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={onPause}
-          disabled={!running || paused || prepping}
-          style={[styles.btn, styles.btnPause, (!running || paused || prepping) && styles.disabled]}
-        >
-          <Text style={styles.btnText}>Pause</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity activeOpacity={0.9} onPress={hardReset} style={[styles.btn, styles.btnReset]}>
-          <Text style={styles.btnText}>Reset</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+      </ImageBackground>
+    </SafeAreaView>
   );
 }
 
 const COLORS = {
-  bg: "#1F2543",
   text: "#F2F0EA",
   textDim: "rgba(242,240,234,0.74)",
   border: "rgba(255,255,255,0.14)",
@@ -676,29 +687,35 @@ const COLORS = {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg, paddingHorizontal: 16, paddingTop: 16 },
+  safe: { flex: 1, backgroundColor: "#0B1020" },
+  bg: { flex: 1 },
 
-  header: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    marginTop: 40,
+  overlayTop: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    height: "55%",
+    backgroundColor: "rgba(0,0,0,0.22)",
+  },
+  overlayBottom: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: "65%",
+    backgroundColor: "rgba(0,0,0,0.32)",
   },
 
-  backBtn: {
-    width: 70,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: "rgba(0,0,0,0.18)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+  container: { flex: 1, paddingHorizontal: 16, paddingTop: 10 },
+
+  headerArea: {
     alignItems: "center",
-    justifyContent: "center",
-    marginTop: 2,
+    paddingTop: 1,
+    paddingBottom: 5,
   },
-  backText: { color: COLORS.text, fontWeight: "900", fontSize: 13 },
 
-  title: { color: COLORS.text, fontSize: 18, fontWeight: "900", textAlign: "center" },
+  title: { color: COLORS.text, fontSize: 20, fontWeight: "900", textAlign: "center" },
 
   sub: {
     color: COLORS.textDim,
@@ -716,11 +733,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.tileBorder,
     padding: 14,
+    marginTop: 6,
   },
   optionsRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   optionLabel: { color: "rgba(242,240,234,0.9)", fontWeight: "900", fontSize: 13, letterSpacing: 0.2 },
 
-  // ✅ ON / OFF buttons
   voiceToggleWrap: { flexDirection: "row", gap: 10 },
   voiceBtn: {
     height: 34,
@@ -732,10 +749,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 14,
   },
-  voiceBtnOn: {
-    backgroundColor: "rgba(34,197,94,0.28)",
-    borderColor: "rgba(34,197,94,0.40)",
-  },
+  voiceBtnOn: { backgroundColor: "rgba(34,197,94,0.28)", borderColor: "rgba(34,197,94,0.40)" },
   voiceBtnOff: { backgroundColor: "rgba(255,255,255,0.08)" },
   voiceBtnText: { color: COLORS.text, fontWeight: "900", letterSpacing: 0.3, fontSize: 12.5 },
 
@@ -750,20 +764,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  bgBtnActive: {
-    backgroundColor: "rgba(59,130,246,0.26)",
-    borderColor: "rgba(59,130,246,0.40)",
-  },
+  bgBtnActive: { backgroundColor: "rgba(59,130,246,0.26)", borderColor: "rgba(59,130,246,0.40)" },
   bgText: { color: COLORS.text, fontWeight: "900", fontSize: 12.5, letterSpacing: 0.2 },
 
-  // ✅ no “must be centered between tile + buttons” — position is explicit and tweakable
   center: {
-  alignItems: "center",
-  justifyContent: "center",
-  flexGrow: 1,      // grows if needed but won't force controls to bottom
-  flexShrink: 1,
-  marginTop: -24,
-  paddingBottom: 110, // leaves room for floating controls
+    alignItems: "center",
+    justifyContent: "center",
+    flex: 1,
+    marginTop: 8,
+    paddingBottom: 6,
   },
 
   circleOuter: {
@@ -805,25 +814,17 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     marginBottom: 8,
   },
-  countText: {
-    color: COLORS.text,
-    fontSize: 58,
-    fontWeight: "900",
-    letterSpacing: 0.5,
-  },
+  countText: { color: COLORS.text, fontSize: 58, fontWeight: "900", letterSpacing: 0.5 },
 
   audioLoading: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 12 },
   audioLoadingText: { color: COLORS.textDim, fontWeight: "700" },
 
-  // ✅ buttons higher — nothing restricting upward movement
   controls: {
-  position: "absolute",
-  left: 16,
-  right: 16,
-  bottom: 60, // <-- move UP: increase this number (e.g. 36, 44)
-  flexDirection: "row",
-  gap: 10,
-},
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 10,
+    marginBottom: 6,
+  },
 
   btn: {
     flex: 1,

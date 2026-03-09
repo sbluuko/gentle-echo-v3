@@ -1,9 +1,11 @@
 // app/(app)/affirmations/review.tsx — FULL REPLACEMENT
 // Step 4: Review + Create
+// ✅ Matches Welcome look: background_image.png + overlays + consistent glass styling
 // ✅ Title centered: "Review Your Affirmation"
 // ✅ Buttons moved directly under review tile
 // ✅ "Create this Affirmation" -> "Create Affirmation" (centered)
-// ✅ Note text updated per request
+// ✅ Note text updated per request (kept as status messaging you already use)
+// ✅ Safe-area aware + scroll-safe
 
 import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
@@ -13,6 +15,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  ImageBackground,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -21,17 +24,28 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase } from "../../../lib/supabase";
 
-const MAKE_CREATE_AFFIRMATION_URL = "https://hook.us2.make.com/eauqovdx69cae89r8lmmrndhv7rho64l";
-const MAKE_DELETE_S3_URL = "https://hook.us2.make.com/j7o2lb216xmcfr3ex8gmnt014qaicnya";
+const MAKE_CREATE_AFFIRMATION_URL =
+  "https://hook.us2.make.com/eauqovdx69cae89r8lmmrndhv7rho64l";
+const MAKE_DELETE_S3_URL =
+  "https://hook.us2.make.com/j7o2lb216xmcfr3ex8gmnt014qaicnya";
 
-const LIBRARY_META_PATH = (FileSystem as any).documentDirectory + "affirmations_library.json";
+const LIBRARY_META_PATH =
+  (FileSystem as any).documentDirectory + "affirmations_library.json";
 const AUDIO_DIR = (FileSystem as any).documentDirectory + "affirmations/";
 const MAX_LIBRARY_ITEMS = 3;
 
 type Affirmation = { id: string; title: string; text: string };
-type Music = { id: string; title: string; url: string; previewUrl?: string; hz?: number; chakra?: string };
+type Music = {
+  id: string;
+  title: string;
+  url: string;
+  previewUrl?: string;
+  hz?: number;
+  chakra?: string;
+};
 type Payload = { affirmation: Affirmation; music: Music };
 
 type LibraryItem = {
@@ -64,7 +78,10 @@ async function readLibrary(): Promise<LibraryItem[]> {
 }
 
 async function writeLibrary(items: LibraryItem[]) {
-  await FileSystem.writeAsStringAsync(LIBRARY_META_PATH, JSON.stringify(items, null, 2));
+  await FileSystem.writeAsStringAsync(
+    LIBRARY_META_PATH,
+    JSON.stringify(items, null, 2)
+  );
 }
 
 async function setIdleAudioMode() {
@@ -123,6 +140,7 @@ function splitAffirmationToSentences(raw: string): string[] {
 export default function ReviewAffirmation() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
 
   const payload: Payload | null = useMemo(() => {
     const raw = typeof params.payload === "string" ? params.payload : "";
@@ -194,6 +212,7 @@ export default function ReviewAffirmation() {
   const callDeleteS3Webhook = async (userId: string, s3Key: string) => {
     try {
       if (!s3Key) return;
+
       const controller = new AbortController();
       const t = setTimeout(() => controller.abort(), 5000);
 
@@ -210,7 +229,10 @@ export default function ReviewAffirmation() {
     }
   };
 
-  const onBack = () => router.back();
+  const onBack = async () => {
+    await stopAndUnloadSound();
+    router.back();
+  };
 
   const onCreate = async () => {
     if (busy) return;
@@ -231,8 +253,6 @@ export default function ReviewAffirmation() {
       const affirmationText = (affirmation.text ?? "").trim();
       const affirmationSentences = splitAffirmationToSentences(affirmationText);
 
-      console.log("SENDING sentences:", affirmationSentences.length, affirmationSentences[0]);
-
       setStatus("Checking login…");
       const { data: authRes, error: authErr } = await supabase.auth.getUser();
       if (authErr) throw new Error(authErr.message);
@@ -245,7 +265,9 @@ export default function ReviewAffirmation() {
       }
 
       if (!isProbablyUuid(userId)) {
-        throw new Error(`Auth user id looks wrong (${userId}). This must be a Supabase UUID.`);
+        throw new Error(
+          `Auth user id looks wrong (${userId}). This must be a Supabase UUID.`
+        );
       }
 
       setStatus("Checking voice profile…");
@@ -263,7 +285,10 @@ export default function ReviewAffirmation() {
         return;
       }
 
-      setStatus("Creating affirmation… This may take up to 5 Minutes. When completed you will automatically be taken to your Affirmation Library.");
+      setStatus(
+        "Creating affirmation… This may take up to 5 Minutes. When completed you will automatically be taken to your Affirmation Library."
+      );
+
       const makeBody = {
         user_id: userId,
         userId,
@@ -305,12 +330,15 @@ export default function ReviewAffirmation() {
         (typeof parsed?.s3_url === "string" && parsed.s3_url.trim()) ||
         (typeof parsed?.finalUrl === "string" && parsed.finalUrl.trim()) ||
         (typeof parsed?.final_url === "string" && parsed.final_url.trim()) ||
-        (typeof parsed?.processedAudioUrl === "string" && parsed.processedAudioUrl.trim()) ||
+        (typeof parsed?.processedAudioUrl === "string" &&
+          parsed.processedAudioUrl.trim()) ||
         (typeof parsed?.mixed_url === "string" && parsed.mixed_url.trim()) ||
         "";
 
       if (!finalUrl) {
-        throw new Error(`Make success but no final URL returned. Response was: ${text || "(empty)"}`);
+        throw new Error(
+          `Make success but no final URL returned. Response was: ${text || "(empty)"}`
+        );
       }
 
       const s3Key =
@@ -324,7 +352,6 @@ export default function ReviewAffirmation() {
       const id = `${Date.now()}`;
       const localPath = `${AUDIO_DIR}${id}.mp3`;
 
-      console.log("DOWNLOADING URL:", finalUrl);
       const dl = await FileSystem.downloadAsync(finalUrl, localPath);
 
       if (dl.status < 200 || dl.status >= 300) {
@@ -338,7 +365,9 @@ export default function ReviewAffirmation() {
         } catch {}
 
         throw new Error(
-          `Download failed: HTTP ${dl.status}\nHost: ${host || "unknown"}\nThis is usually an S3 permission/signature issue (403).`
+          `Download failed: HTTP ${dl.status}\nHost: ${
+            host || "unknown"
+          }\nThis is usually an S3 permission/signature issue (403).`
         );
       }
 
@@ -373,89 +402,128 @@ export default function ReviewAffirmation() {
       setStatus("Done. Playing…");
       await playLocal(localPath);
 
-      router.replace("/(app)/affirmations/library");
+      router.push("/(app)/affirmations/library");
     } catch (e: any) {
       const msg = String(e?.message ?? e);
       Alert.alert("Error", msg);
       setStatus("Something went wrong. Try again.");
+      // eslint-disable-next-line no-console
       console.log("REVIEW ERROR:", msg);
     } finally {
       setBusy(false);
     }
   };
 
+  const bottomPadding = Math.max(18, insets.bottom + 14);
+
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 30 : 0}
-    >
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <Animated.View style={[styles.inner, { opacity: fade, transform: [{ translateY: lift }] }]}>
-          <Text style={styles.header}>Review Your Affirmation</Text>
+    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+      <ImageBackground
+        source={require("../../../assets/images/background_image.png")}
+        style={styles.bg}
+        resizeMode="cover"
+      >
+        <View style={styles.overlayTop} />
+        <View style={styles.overlayBottom} />
 
-          <View style={styles.panel}>
-            <Text style={styles.panelTitle}>Affirmation</Text>
-            <Text style={styles.panelBody}>{affirmation?.title ?? "—"}</Text>
+        <KeyboardAvoidingView
+          style={styles.kav}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
+        >
+          <ScrollView contentContainerStyle={styles.scroll} bounces={false} showsVerticalScrollIndicator={false}>
+            <Animated.View style={[styles.inner, { opacity: fade, transform: [{ translateY: lift }] }]}>
+              <Text style={styles.header}>Review Your Affirmation</Text>
 
-            <View style={{ height: 12 }} />
+              <View style={styles.panel}>
+                <Text style={styles.panelTitle}>Affirmation</Text>
+                <Text style={styles.panelBody}>{affirmation?.title ?? "—"}</Text>
 
-            <Text style={styles.panelTitle}>Music</Text>
-            <Text style={styles.panelBody}>{music?.title ?? "—"}</Text>
-          </View>
+                <View style={{ height: 12 }} />
 
-          {/* ✅ Buttons moved directly under Review tile */}
-          <View style={styles.btnRow}>
-            <TouchableOpacity
-              activeOpacity={0.9}
-              disabled={busy}
-              onPress={onBack}
-              style={[styles.btn, styles.btnGhost, busy && styles.disabled]}
-            >
-              <Text style={styles.btnText}>Back</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.9}
-              disabled={busy}
-              onPress={onCreate}
-              style={[styles.btn, styles.btnPrimary, busy && styles.disabled]}
-            >
-              <Text style={styles.btnText}>{busy ? "Creating…" : "Create Affirmation"}</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Status card stays below buttons */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Status</Text>
-            <Text style={styles.cardBody}>{status}</Text>
-
-            {busy ? (
-              <View style={styles.row}>
-                <ActivityIndicator color="rgba(242,240,234,0.82)" />
-                <Text style={styles.rowText}>Working…</Text>
+                <Text style={styles.panelTitle}>Music</Text>
+                <Text style={styles.panelBody}>{music?.title ?? "—"}</Text>
               </View>
-            ) : null}
-          </View>
 
-        </Animated.View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+              {/* ✅ Buttons directly under review tile */}
+              <View style={styles.btnRow}>
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  disabled={busy}
+                  onPress={onBack}
+                  style={[styles.btn, styles.btnGhost, busy && styles.disabled]}
+                >
+                  <Text style={styles.btnText}>Back</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  disabled={busy}
+                  onPress={onCreate}
+                  style={[styles.btn, styles.btnPrimary, busy && styles.disabled]}
+                >
+                  <Text style={styles.btnText}>
+                    {busy ? "Creating…" : "Create Affirmation"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Status card */}
+              <View style={styles.statusCard}>
+                <Text style={styles.statusTitle}>Status</Text>
+                <Text style={styles.statusBody}>{status}</Text>
+
+                {busy ? (
+                  <View style={styles.row}>
+                    <ActivityIndicator color="rgba(242,240,234,0.82)" />
+                    <Text style={styles.rowText}>Working…</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* bottom breathing room */}
+              <View style={{ height: bottomPadding }} />
+            </Animated.View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </ImageBackground>
+    </SafeAreaView>
   );
 }
 
 const COLORS = {
-  dusk: "#26384C",
   text: "#F2F0EA",
+  textSoft: "rgba(242,240,234,0.84)",
   textDim: "rgba(242,240,234,0.70)",
+  border: "rgba(255,255,255,0.14)",
   panel: "rgba(255,255,255,0.12)",
   panelBorder: "rgba(255,255,255,0.14)",
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.dusk },
-  scroll: { padding: 16, paddingBottom: 40 },
-  inner: { paddingTop: 70 },
+  safe: { flex: 1, backgroundColor: "#0B1020" },
+  bg: { flex: 1 },
+  kav: { flex: 1 },
+
+  overlayTop: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    height: "55%",
+    backgroundColor: "rgba(0,0,0,0.22)",
+  },
+  overlayBottom: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: "65%",
+    backgroundColor: "rgba(0,0,0,0.32)",
+  },
+
+  scroll: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 },
+  inner: { paddingTop: 64 },
 
   header: {
     color: COLORS.text,
@@ -466,7 +534,7 @@ const styles = StyleSheet.create({
   },
 
   panel: {
-    borderRadius: 16,
+    borderRadius: 18,
     backgroundColor: COLORS.panel,
     borderWidth: 1,
     borderColor: COLORS.panelBorder,
@@ -482,43 +550,12 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   panelBody: {
-    color: "rgba(242,240,234,0.82)",
+    color: "rgba(55,240,234,0.82)",
     fontSize: 13.5,
     fontWeight: "800",
     textAlign: "center",
     lineHeight: 19,
   },
-
-  card: {
-    borderRadius: 16,
-    backgroundColor: "rgba(0,0,0,0.20)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    padding: 14,
-    marginTop: 12,
-  },
-  cardTitle: {
-    color: COLORS.text,
-    fontSize: 14,
-    fontWeight: "900",
-    textAlign: "center",
-    marginBottom: 6,
-  },
-  cardBody: {
-    color: "rgba(242,240,234,0.82)",
-    fontSize: 14,
-    textAlign: "center",
-    lineHeight: 19,
-  },
-
-  row: {
-    marginTop: 10,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 10,
-  },
-  rowText: { color: COLORS.textDim, fontSize: 13, fontWeight: "700" },
 
   btnRow: { flexDirection: "row", gap: 10, marginTop: 2 },
   btn: {
@@ -538,23 +575,49 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     elevation: 12,
   },
-  btnGhost: { backgroundColor: "rgba(0,0,0,0.20)", borderColor: "rgba(255,255,255,0.12)" },
+  btnGhost: {
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderColor: "rgba(255,255,255,0.16)",
+  },
   btnText: {
     color: "#fff",
     fontSize: 13.5,
     fontWeight: "900",
     letterSpacing: 0.2,
     textAlign: "center",
+    paddingHorizontal: 8,
   },
 
-  note: {
+  statusCard: {
+    borderRadius: 18,
+    backgroundColor: "rgba(0,0,0,0.22)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    padding: 14,
     marginTop: 12,
-    color: "rgba(242,240,234,0.70)",
-    fontSize: 12.5,
-    textAlign: "center",
-    fontWeight: "600",
-    lineHeight: 18,
   },
+  statusTitle: {
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: "900",
+    textAlign: "center",
+    marginBottom: 6,
+  },
+  statusBody: {
+    color: "rgba(242,240,234,0.82)",
+    fontSize: 14,
+    textAlign: "center",
+    lineHeight: 19,
+  },
+
+  row: {
+    marginTop: 10,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 10,
+  },
+  rowText: { color: COLORS.textDim, fontSize: 13, fontWeight: "700" },
 
   disabled: { opacity: 0.65 },
 });

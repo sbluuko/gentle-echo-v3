@@ -1,26 +1,27 @@
 // app/(app)/main.tsx — FULL REPLACEMENT
-// ✅ STEP 1/2/3/4 bold only, wrapped lines indent to align with the text (not the STEP label)
-// ✅ ~10% larger spacing between step paragraphs
-// ✅ "GO TO MY ECHO LIBRARY" is a GREEN button
-// ✅ Everything else unchanged vs prior version
+// ✅ Uses global AppScreen background (matches Welcome/Home)
+// ✅ Keeps ALL existing Voice Echo logic + UI
+// ✅ Header title set (Stack)
+// ✅ Echo Library navigation uses router.push() so Back works
+// ✅ Still gates to Train if voice not ready (replace is correct for gate)
 
 import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
-import { useRouter } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Animated,
-  KeyboardAvoidingView,
-  Platform,
-  SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 import { supabase } from "../../lib/supabase";
+
+// ✅ Global wrapper + consistent buttons (your shared look)
+import AppScreen from "../../components/AppScreen";
 
 const MAKE_PROCESSMESSAGE_URL =
   "https://hook.us2.make.com/3warr9f3b4llyy8lfzod7tksl3n82vfw";
@@ -254,7 +255,7 @@ export default function Main() {
       if (error) return;
 
       if (!profile?.voice_ready || !profile?.voice_id) {
-        router.replace("/(app)/train");
+        router.replace("/(app)/train"); // ✅ gate uses replace
       }
     } catch {
       // silent
@@ -461,7 +462,9 @@ export default function Main() {
       const echoId = await addEchoToLibrary(target);
 
       setStatusLine("Opening Echo Library…");
-      router.replace({
+
+      // ✅ IMPORTANT: push() so back button exists
+      router.push({
         pathname: "/(app)/echo-library",
         params: { autoplay: "1", id: echoId },
       });
@@ -503,16 +506,7 @@ export default function Main() {
   const canCreate =
     !!recordedUri && !busy && !isRecording && !jobInFlightRef.current;
 
-  // Used to indent wrapped lines so they align with the message text, not "STEP X:"
-  const STEP_LABEL_WIDTH = 70;
-
-  const StepLine = ({
-    label,
-    text,
-  }: {
-    label: string;
-    text: string;
-  }) => (
+  const StepLine = ({ label, text }: { label: string; text: string }) => (
     <View style={styles.stepRow}>
       <Text style={styles.stepLabel}>{label}</Text>
       <Text style={styles.stepBody}>{text}</Text>
@@ -520,181 +514,139 @@ export default function Main() {
   );
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 30 : 0}
-    >
-      <SafeAreaView style={styles.safe}>
-        <Animated.View
-          style={[
-            styles.inner,
-            { opacity: fade, transform: [{ translateY: lift }] },
-          ]}
-        >
-          {/* Header */}
-          <View style={styles.headerBlock}>
-            <Text style={styles.headerTitle}>REFLECTIONS</Text>
-          </View>
+    <AppScreen scroll>
+      <Stack.Screen options={{ title: "VOICE ECHO" }} />
 
-          {/* STEP tile */}
-          <View style={styles.stepCard}>
-            <StepLine
-              label="STEP 1:"
-              text="Press the RECORD button and record your thoughts"
-            />
-            <StepLine
-              label="STEP 2:"
-              text="When finished recording press the STOP button"
-            />
-            <StepLine
-              label="STEP 3:"
-              text="Select CREATE AN ECHO button to create your playback message"
-            />
-            <StepLine
-              label="STEP 4:"
-              text="When the message is ready you will automatically be taken to your Echo Library"
-            />
-          </View>
+      <Animated.View style={[styles.inner, { opacity: fade, transform: [{ translateY: lift }] }]}>
+        {/* STEP tile */}
+        <View style={styles.stepCard}>
+          <StepLine label="STEP 1:" text="Press the RECORD button and record your thoughts" />
+          <StepLine label="STEP 2:" text="When finished recording press the STOP button" />
+          <StepLine label="STEP 3:" text="Select CREATE AN ECHO button to create your playback message" />
+          <StepLine label="STEP 4:" text="When the message is ready you will automatically be taken to your Echo Library" />
+        </View>
 
-          <View style={styles.spaceHeaderToRecord} />
+        <View style={styles.spaceHeaderToRecord} />
 
-          {/* Recording Panel */}
-          <View style={styles.recordPanel}>
-            <Text style={styles.recordTitle}>Record Your Message</Text>
+        {/* Recording Panel */}
+        <View style={styles.recordPanel}>
+          <Text style={styles.recordTitle}>Record Your Message</Text>
 
-            <WaveformBars active={isRecording} level={waveLevel} />
+          <WaveformBars active={isRecording} level={waveLevel} />
 
-            <View style={styles.spaceWaveToButtons} />
+          <View style={styles.spaceWaveToButtons} />
 
-            {/* Row: RECORD (2x) + STOP (1x) */}
-            <View style={styles.recordStopRow}>
-              <TouchableOpacity
-                activeOpacity={0.9}
-                onPress={startRecording}
-                disabled={!canRecord}
-                style={[
-                  styles.squareAction,
-                  styles.squareGreen,
-                  styles.recordWide,
-                  !canRecord && styles.disabled,
-                ]}
-              >
-                <Text style={styles.squareActionText}>RECORD</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.9}
-                onPress={stopRecording}
-                disabled={!canStop}
-                style={[
-                  styles.squareAction,
-                  styles.squareRed,
-                  styles.stopNarrow,
-                  !canStop && styles.disabled,
-                ]}
-              >
-                <Text style={styles.squareActionText}>STOP</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.spaceRowToCreate} />
-
-            {/* CREATE AN ECHO */}
+          {/* Row: RECORD (2x) + STOP (1x) */}
+          <View style={styles.recordStopRow}>
             <TouchableOpacity
               activeOpacity={0.9}
-              onPress={createEcho}
-              disabled={!canCreate}
+              onPress={startRecording}
+              disabled={!canRecord}
               style={[
                 styles.squareAction,
-                styles.squareBlue,
-                !canCreate && styles.disabled,
+                styles.squareGreen,
+                styles.recordWide,
+                !canRecord && styles.disabled,
               ]}
             >
-              <Text style={styles.squareActionText}>CREATE AN ECHO</Text>
+              <Text style={styles.squareActionText}>RECORD</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={stopRecording}
+              disabled={!canStop}
+              style={[
+                styles.squareAction,
+                styles.squareRed,
+                styles.stopNarrow,
+                !canStop && styles.disabled,
+              ]}
+            >
+              <Text style={styles.squareActionText}>STOP</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Status tile moved BELOW Record panel, and smaller */}
-          <View style={styles.gapRecordToStatus} />
+          <View style={styles.spaceRowToCreate} />
 
-          <View style={styles.statusCardSmall}>
-            <Text style={styles.statusTitleSmall}>What's Happening Now</Text>
-            <Text style={styles.statusLineSmall}>{statusLine}</Text>
-
-            {busy ? (
-              <View style={styles.workingRow}>
-                <ActivityIndicator color={COLORS.textSoft} />
-                <Text style={styles.workingText}>Working…</Text>
-              </View>
-            ) : null}
-          </View>
-
-          {/* Standalone green button */}
-          <View style={styles.gapStatusToLibraryBtn} />
+          {/* CREATE AN ECHO */}
           <TouchableOpacity
             activeOpacity={0.9}
-            onPress={() => router.push("/(app)/echo-library")}
-            style={styles.libraryButtonGreen}
+            onPress={createEcho}
+            disabled={!canCreate}
+            style={[
+              styles.squareAction,
+              styles.squareBlue,
+              !canCreate && styles.disabled,
+            ]}
           >
-            <Text style={styles.libraryButtonText}>GO TO MY ECHO LIBRARY</Text>
+            <Text style={styles.squareActionText}>CREATE AN ECHO</Text>
           </TouchableOpacity>
+        </View>
 
-          {/* hidden debug */}
-          <Text selectable style={styles.hiddenDebug}>
-            {recordedUri ? `last_recorded_uri=${recordedUri}` : ""}
-          </Text>
-        </Animated.View>
-      </SafeAreaView>
-    </KeyboardAvoidingView>
+        {/* Status tile */}
+        <View style={styles.gapRecordToStatus} />
+
+        <View style={styles.statusCardSmall}>
+          <Text style={styles.statusTitleSmall}>What's Happening Now</Text>
+          <Text style={styles.statusLineSmall}>{statusLine}</Text>
+
+          {busy ? (
+            <View style={styles.workingRow}>
+              <ActivityIndicator color={COLORS.textSoft} />
+              <Text style={styles.workingText}>Working…</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {/* Standalone green button */}
+        <View style={styles.gapStatusToLibraryBtn} />
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => router.push("/(app)/echo-library")}
+          style={styles.libraryButtonGreen}
+        >
+          <Text style={styles.libraryButtonText}>GO TO MY ECHO LIBRARY</Text>
+        </TouchableOpacity>
+
+        {/* hidden debug */}
+        <Text selectable style={styles.hiddenDebug}>
+          {recordedUri ? `last_recorded_uri=${recordedUri}` : ""}
+        </Text>
+
+        <View style={{ height: 10 }} />
+      </Animated.View>
+    </AppScreen>
   );
 }
 
 const COLORS = {
-  dusk: "#26384C",
   text: "#F2F0EA",
   textSoft: "rgba(242,240,234,0.82)",
   textDim: "rgba(242,240,234,0.70)",
 
-  panel: "rgba(255,255,255,0.12)",
+  panel: "rgba(19,167,154,0.70)",
   panelBorder: "rgba(255,255,255,0.14)",
 
   actionGreen: "rgba(34,197,94,0.78)",
   actionRed: "rgba(239,68,68,0.78)",
   actionBlue: "rgba(59,130,246,0.78)",
 
-  waveBg: "rgba(255,255,255,0.08)",
+  waveBg: "rgba(255,255,255,0.3)",
   waveBorder: "rgba(255,255,255,0.12)",
 
-  // Green for library button
   libraryGreen: "rgba(34,197,94,0.80)",
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.dusk },
-  safe: { flex: 1, backgroundColor: COLORS.dusk },
-
+  // Inner wrapper inside AppScreen
   inner: {
-    flex: 1,
-    paddingHorizontal: 18,
     paddingTop: 6,
-    paddingBottom: 18,
-  },
-
-  headerBlock: { marginTop: 18 },
-
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: COLORS.text,
-    textAlign: "center",
-    letterSpacing: 0.7,
-    marginBottom: 10,
   },
 
   // STEP tile
   stepCard: {
-    borderRadius: 16,
+    borderRadius: 18,
     backgroundColor: COLORS.panel,
     borderWidth: 1,
     borderColor: COLORS.panelBorder,
@@ -702,17 +654,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
 
-  // Each line as a row so wrapped text aligns under the body text, not label
   stepRow: {
     flexDirection: "row",
     alignItems: "flex-start",
-    marginBottom: 7, // ~10% larger than 6
+    marginBottom: 7,
   },
   stepLabel: {
     width: 70,
     fontSize: 13,
     color: COLORS.textSoft,
-    fontWeight: "900", // ✅ STEP label bold
+    fontWeight: "900",
     letterSpacing: 0.1,
     lineHeight: 19,
   },
@@ -729,7 +680,7 @@ const styles = StyleSheet.create({
 
   // Recording Panel
   recordPanel: {
-    borderRadius: 16,
+    borderRadius: 18,
     backgroundColor: COLORS.panel,
     borderWidth: 1,
     borderColor: COLORS.panelBorder,
@@ -754,7 +705,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   waveInner: {
-    height: 58,
+    height: 30,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -773,7 +724,7 @@ const styles = StyleSheet.create({
   },
 
   squareAction: {
-    height: 62,
+    height: 52,
     borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
@@ -852,7 +803,6 @@ const styles = StyleSheet.create({
 
   gapStatusToLibraryBtn: { height: 18 },
 
-  // GREEN library button
   libraryButtonGreen: {
     alignSelf: "center",
     paddingVertical: 14,

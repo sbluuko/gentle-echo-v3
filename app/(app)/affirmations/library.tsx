@@ -1,8 +1,10 @@
 // app/(app)/affirmations/library.tsx — FULL REPLACEMENT
-// ✅ Slider/tracker ONLY on the active (currently playing) card
-// ✅ Live position + duration tracking
-// ✅ Scrub to seek (onSlidingComplete)
-// ✅ Keeps your interruption handling + existing controls
+// ✅ Updated to newer Gentle Echo visual style
+// ✅ Background image + dark overlay
+// ✅ Modernized cards / tiles
+// ✅ Keeps active-card-only slider
+// ✅ Keeps interruption handling + playback controls
+// ✅ Keeps create button routing
 
 import Slider from "@react-native-community/slider";
 import { Audio } from "expo-av";
@@ -13,12 +15,14 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  ImageBackground,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
   attachInterruptionHandlers,
@@ -64,17 +68,13 @@ export default function AffirmationsLibrary() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
 
-  // ✅ Slider state (active card only)
   const [positionMs, setPositionMs] = useState(0);
   const [durationMs, setDurationMs] = useState(1);
-
-  // prevent slider value fighting with onPlaybackStatusUpdate while dragging
   const [isSeeking, setIsSeeking] = useState(false);
 
   const fade = useRef(new Animated.Value(0)).current;
   const lift = useRef(new Animated.Value(10)).current;
 
-  // Track "is playing now" reliably
   const isPlayingNowRef = useRef(false);
 
   const stopAndUnload = async () => {
@@ -84,13 +84,11 @@ export default function AffirmationsLibrary() {
         await soundRef.current.unloadAsync().catch(() => {});
       }
     } catch {}
-    soundRef.current = null;
 
+    soundRef.current = null;
     setActiveId(null);
     setPaused(false);
     isPlayingNowRef.current = false;
-
-    // reset slider
     setPositionMs(0);
     setDurationMs(1);
     setIsSeeking(false);
@@ -134,7 +132,6 @@ export default function AffirmationsLibrary() {
       setLoading(false);
     })();
 
-    // Attach interruption handling
     const detach = attachInterruptionHandlers({
       pause,
       resume,
@@ -150,7 +147,6 @@ export default function AffirmationsLibrary() {
 
   const play = async (it: LibraryItem) => {
     try {
-      // If same card + paused -> resume
       if (activeId === it.id && paused && soundRef.current) {
         await resume();
         return;
@@ -168,7 +164,6 @@ export default function AffirmationsLibrary() {
       setPaused(false);
       isPlayingNowRef.current = true;
 
-      // reset slider
       setPositionMs(0);
       setDurationMs(1);
       setIsSeeking(false);
@@ -176,21 +171,24 @@ export default function AffirmationsLibrary() {
       sound.setOnPlaybackStatusUpdate((s: any) => {
         if (!s?.isLoaded) return;
 
-        // update time tracking (don’t fight user while dragging)
         if (!isSeeking) {
-          if (typeof s.positionMillis === "number") setPositionMs(s.positionMillis);
+          if (typeof s.positionMillis === "number") {
+            setPositionMs(s.positionMillis);
+          }
         }
+
         if (typeof s.durationMillis === "number" && s.durationMillis > 0) {
           setDurationMs(s.durationMillis);
         }
 
-        // If system interrupted playback, mark paused so app can resume gracefully later
         if (s?.shouldPlay && !s?.isPlaying && !s?.didJustFinish) {
           setPaused(true);
           isPlayingNowRef.current = false;
         }
 
-        if (s?.didJustFinish) stopAndUnload();
+        if (s?.didJustFinish) {
+          stopAndUnload();
+        }
       });
     } catch (e: any) {
       Alert.alert("Playback error", String(e?.message ?? e));
@@ -208,96 +206,119 @@ export default function AffirmationsLibrary() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scroll}>
-      <Animated.View
-        style={[
-          styles.inner,
-          { opacity: fade, transform: [{ translateY: lift }] },
-        ]}
+    <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
+      <ImageBackground
+        source={require("../../../assets/images/background_image.png")}
+        style={styles.bg}
+        resizeMode="cover"
       >
-        <Text style={styles.header}>My Affirmation Library</Text>
-        <View style={{ height: 14 }} />
+        <View style={styles.bgDarken} />
 
-        {loading ? (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator />
-          </View>
-        ) : items.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyTitle}>No affirmations yet</Text>
-            <Text style={styles.emptySub}>Create one to start your library.</Text>
-          </View>
-        ) : (
-          <View style={{ gap: 14 }}>
-            {items.map((it) => {
-              const active = activeId === it.id;
-              const max = Math.max(1, durationMs || 1);
-              const val = Math.max(0, Math.min(positionMs, max));
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={styles.scroll}
+          showsVerticalScrollIndicator={false}
+        >
+          <Animated.View
+            style={[
+              styles.inner,
+              { opacity: fade, transform: [{ translateY: lift }] },
+            ]}
+          >
+            <Text style={styles.kicker}>Your Personal Collection</Text>
+            <Text style={styles.header}>My Affirmation Library</Text>
+            <Text style={styles.subheader}>
+              Listen back to your saved affirmations whenever you need calm, clarity, or rest.
+            </Text>
 
-              return (
-                <View key={it.id} style={styles.card}>
-                  <Text style={styles.title}>{it.title}</Text>
-                  <Text style={styles.meta}>Music: {it.music_title}</Text>
-                  <Text style={styles.meta}>
-                    Created: {new Date(it.created_at).toLocaleString()}
-                  </Text>
+            <View style={{ height: 18 }} />
 
-                  {/* ✅ Slider ONLY for active card */}
-                  {active ? (
-                    <View style={styles.trackerWrap}>
-                      <Slider
-                        style={{ width: "100%" }}
-                        minimumValue={0}
-                        maximumValue={max}
-                        value={val}
-                        onSlidingStart={() => setIsSeeking(true)}
-                        onValueChange={(v) => setPositionMs(Math.floor(v))}
-                        onSlidingComplete={async (v) => {
-                          await seekTo(Number(v));
-                          setIsSeeking(false);
-                        }}
-                        minimumTrackTintColor="rgba(242,240,234,0.95)"
-                        maximumTrackTintColor="rgba(255,255,255,0.20)"
-                        thumbTintColor="rgba(242,240,234,0.95)"
-                      />
-                      <View style={styles.timeRow}>
-                        <Text style={styles.timeText}>{fmtTime(val)}</Text>
-                        <Text style={styles.timeText}>{fmtTime(max)}</Text>
+            {loading ? (
+              <View style={styles.loadingBox}>
+                <ActivityIndicator color="#F2F0EA" />
+              </View>
+            ) : items.length === 0 ? (
+              <View style={styles.emptyBox}>
+                <Text style={styles.emptyTitle}>No affirmations yet</Text>
+                <Text style={styles.emptySub}>
+                  Create your first affirmation to begin building your personal library.
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.cardsWrap}>
+                {items.map((it) => {
+                  const active = activeId === it.id;
+                  const max = Math.max(1, durationMs || 1);
+                  const val = Math.max(0, Math.min(positionMs, max));
+
+                  return (
+                    <View key={it.id} style={[styles.card, active && styles.cardActive]}>
+                      <Text style={styles.title}>{it.title}</Text>
+                      <Text style={styles.meta}>Music: {it.music_title}</Text>
+                      <Text style={styles.meta}>
+                        Created: {new Date(it.created_at).toLocaleString()}
+                      </Text>
+
+                      {active ? (
+                        <View style={styles.trackerWrap}>
+                          <Slider
+                            style={{ width: "100%" }}
+                            minimumValue={0}
+                            maximumValue={max}
+                            value={val}
+                            onSlidingStart={() => setIsSeeking(true)}
+                            onValueChange={(v) => setPositionMs(Math.floor(v))}
+                            onSlidingComplete={async (v) => {
+                              await seekTo(Number(v));
+                              setIsSeeking(false);
+                            }}
+                            minimumTrackTintColor="rgba(242,240,234,0.95)"
+                            maximumTrackTintColor="rgba(255,255,255,0.20)"
+                            thumbTintColor="rgba(242,240,234,0.95)"
+                          />
+                          <View style={styles.timeRow}>
+                            <Text style={styles.timeText}>{fmtTime(val)}</Text>
+                            <Text style={styles.timeText}>{fmtTime(max)}</Text>
+                          </View>
+                        </View>
+                      ) : null}
+
+                      <View style={styles.iconRow}>
+                        <IconBtn label="▶️" color="#22c55e" onPress={() => play(it)} />
+                        <IconBtn
+                          label="⏸"
+                          color="#f59e0b"
+                          disabled={!active || paused}
+                          onPress={pause}
+                        />
+                        <IconBtn
+                          label="⏹"
+                          color="#ef4444"
+                          disabled={!active}
+                          onPress={stopAndUnload}
+                        />
                       </View>
                     </View>
-                  ) : null}
+                  );
+                })}
+              </View>
+            )}
 
-                  <View style={styles.iconRow}>
-                    <IconBtn label="▶️" color="#22c55e" onPress={() => play(it)} />
-                    <IconBtn
-                      label="⏸"
-                      color="#f59e0b"
-                      disabled={!active || paused}
-                      onPress={pause}
-                    />
-                    <IconBtn
-                      label="⏹"
-                      color="#ef4444"
-                      disabled={!active}
-                      onPress={stopAndUnload}
-                    />
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        )}
+            <View style={{ height: 24 }} />
 
-        <View style={{ height: 26 }} />
-        <TouchableOpacity
-          onPress={() => router.push("/(app)/affirmations/create")}
-          style={styles.createBtn}
-        >
-          <Text style={styles.createText}>Create Another Affirmation</Text>
-        </TouchableOpacity>
-        <View style={{ height: 30 }} />
-      </Animated.View>
-    </ScrollView>
+            <TouchableOpacity
+              onPress={() => router.push("/(app)/affirmations/create")}
+              style={styles.createBtn}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.createText}>Create Another Affirmation</Text>
+            </TouchableOpacity>
+
+            <View style={{ height: 34 }} />
+          </Animated.View>
+        </ScrollView>
+      </ImageBackground>
+    </SafeAreaView>
   );
 }
 
@@ -312,6 +333,7 @@ function IconBtn(props: {
       onPress={props.onPress}
       disabled={props.disabled}
       style={[styles.iconBtn, props.disabled && styles.disabled]}
+      activeOpacity={0.85}
     >
       <Text style={[styles.icon, { color: props.color }]}>{props.label}</Text>
     </TouchableOpacity>
@@ -319,45 +341,112 @@ function IconBtn(props: {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#26384C" },
-  scroll: { padding: 16, paddingBottom: 40 },
-  inner: { paddingTop: 52 },
-  header: { color: "#F2F0EA", fontSize: 22, fontWeight: "900", textAlign: "center" },
-
-  createBtn: {
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: "rgba(59,130,246,0.8)",
-    justifyContent: "center",
-    alignItems: "center",
+  safe: {
+    flex: 1,
+    backgroundColor: "#26384C",
   },
-  createText: { color: "#fff", fontSize: 14, fontWeight: "900" },
 
-  loadingBox: { paddingVertical: 24, alignItems: "center" },
+  bg: {
+    flex: 1,
+  },
+
+  bgDarken: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(18, 28, 40, 0.78)",
+  },
+
+  container: {
+    flex: 1,
+  },
+
+  scroll: {
+    paddingHorizontal: 16,
+    paddingBottom: 40,
+  },
+
+  inner: {
+    flex: 1,
+    paddingTop: 44,
+  },
+
+  kicker: {
+    color: "rgba(242,240,234,0.82)",
+    fontSize: 14,
+    fontWeight: "700",
+    textAlign: "center",
+    letterSpacing: 0.4,
+    marginBottom: 6,
+  },
+
+  header: {
+    color: "#F2F0EA",
+    fontSize: 28,
+    fontWeight: "900",
+    textAlign: "center",
+    marginBottom: 10,
+  },
+
+  subheader: {
+    color: "rgba(242,240,234,0.78)",
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "600",
+    textAlign: "center",
+    paddingHorizontal: 10,
+  },
+
+  loadingBox: {
+    marginTop: 10,
+    paddingVertical: 28,
+    alignItems: "center",
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
 
   emptyBox: {
-    borderRadius: 16,
+    borderRadius: 18,
     backgroundColor: "rgba(255,255,255,0.12)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.14)",
-    padding: 16,
+    paddingVertical: 24,
+    paddingHorizontal: 18,
     alignItems: "center",
   },
-  emptyTitle: { color: "#F2F0EA", fontSize: 14, fontWeight: "900" },
-  emptySub: {
-    color: "rgba(242,240,234,0.7)",
-    fontSize: 12.5,
-    marginTop: 6,
+
+  emptyTitle: {
+    color: "#F2F0EA",
+    fontSize: 16,
+    fontWeight: "900",
     textAlign: "center",
   },
 
-  card: {
-    borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    padding: 14,
+  emptySub: {
+    color: "rgba(242,240,234,0.75)",
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 8,
+    textAlign: "center",
   },
+
+  cardsWrap: {
+    gap: 14,
+  },
+
+  card: {
+    borderRadius: 18,
+    backgroundColor: "rgba(19,167,154,0.50)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+    padding: 16,
+  },
+
+  cardActive: {
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderColor: "rgba(255,255,255,0.24)",
+  },
+
   title: {
     color: "#F2F0EA",
     fontSize: 24,
@@ -365,45 +454,78 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 6,
   },
+
   meta: {
     marginTop: 6,
-    color: "rgba(242,240,234,0.78)",
+    color: "rgba(242,240,234,0.80)",
     fontSize: 12.5,
     textAlign: "center",
+    lineHeight: 18,
   },
 
   trackerWrap: {
     marginTop: 14,
     borderRadius: 14,
-    backgroundColor: "rgba(0,0,0,0.14)",
+    backgroundColor: "rgba(0,0,0,0.18)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.14)",
     paddingHorizontal: 12,
     paddingTop: 10,
     paddingBottom: 10,
   },
+
   timeRow: {
     marginTop: 6,
     flexDirection: "row",
     justifyContent: "space-between",
   },
+
   timeText: {
-    color: "rgba(242,240,234,0.70)",
+    color: "rgba(242,240,234,0.72)",
     fontSize: 12,
     fontWeight: "800",
   },
 
-  iconRow: { marginTop: 16, flexDirection: "row", justifyContent: "center", gap: 24 },
+  iconRow: {
+    marginTop: 16,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 24,
+  },
+
   iconBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
+    width: 48,
+    height: 48,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.25)",
+    borderColor: "rgba(255,255,255,0.22)",
     backgroundColor: "rgba(255,255,255,0.12)",
     justifyContent: "center",
     alignItems: "center",
   },
-  icon: { fontSize: 32 },
-  disabled: { opacity: 0.4 },
+
+  icon: {
+    fontSize: 32,
+  },
+
+  disabled: {
+    opacity: 0.4,
+  },
+
+  createBtn: {
+    height: 58,
+    borderRadius: 16,
+    backgroundColor: "rgba(37,99,235,0.82)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  createText: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "900",
+    letterSpacing: 0.2,
+  },
 });

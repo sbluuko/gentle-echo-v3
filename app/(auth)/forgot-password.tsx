@@ -58,7 +58,7 @@ export default function ForgotPassword() {
       [
         {
           text: "Back to sign in",
-          onPress: () => router.replace("/(auth)"),
+          onPress: () => router.push("/(auth)"),
         },
       ]
     );

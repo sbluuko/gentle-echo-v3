@@ -2,21 +2,21 @@
   "expo": {
     "name": "GentleEcho",
     "slug": "GentleEcho",
-    "version": "1.0.4",
+    "version": "1.0.6",
     "orientation": "portrait",
-    "icon": "./assets/images/Gentle Echo logo v2.png",
+    "icon": "./assets/images/GentleEchoLogo.png",
     "scheme": "gentleecho",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/splash-icon.png",
+      "image": "./assets/images/GentleEchoLogo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.gentleechov2.app",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Gentle Echo uses the microphone so you can record a reflection and hear it echoed back with calm and clarity.",
         "ITSAppUsesNonExemptEncryption": false
@@ -24,12 +24,12 @@
     },
     "android": {
       "package": "com.gentleechov2.app",
-      "versionCode": 4,
+      "versionCode": 6,
       "permissions": [
         "RECORD_AUDIO"
       ],
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/images/GentleEchoLogo.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
