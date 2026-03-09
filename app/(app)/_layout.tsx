@@ -1,8 +1,17 @@
 // app/(app)/_layout.tsx — FULL REPLACEMENT (REFLECTIONS ONLY)
+// ✅ Global header uses text-only "Previous Screen" instead of arrow
+// ✅ Train page still has no header/back path once overridden in train.tsx
+// ✅ Home redirect after training
+// ✅ Auth + profile gate preserved
 
 import { Stack, useRouter, useSegments } from "expo-router";
 import React, { useEffect, useMemo } from "react";
-import { ActivityIndicator, View } from "react-native";
+import {
+  ActivityIndicator,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { useProfile } from "../../lib/useProfile";
@@ -46,7 +55,7 @@ function AppLayoutInner() {
     }
 
     if (trainingDone && routeName === "train") {
-      router.replace("/(app)/welcome");
+      router.replace("/(app)/home");
       return;
     }
   }, [isLoading, session, trainingDone, routeName, router]);
@@ -54,15 +63,38 @@ function AppLayoutInner() {
   return (
     <View style={{ flex: 1 }}>
       <Stack
-        screenOptions={{
+        screenOptions={({ navigation, route }) => ({
           headerShown: true,
-          headerBackTitle: "Back",
-          headerTitle: "Gentle Echo",
+          headerBackVisible: false,
+          headerTitle: "",
           headerTintColor: "#F2F0EA",
           headerStyle: { backgroundColor: "#26384C" },
           headerTitleStyle: { fontWeight: "900" },
           headerShadowVisible: false,
-        }}
+          headerLeft: () => {
+            if (!navigation.canGoBack()) return null;
+            if (route.name === "home") return null;
+            if (route.name === "train") return null;
+
+            return (
+              <TouchableOpacity
+                onPress={() => navigation.goBack()}
+                style={{ paddingVertical: 6, paddingRight: 8 }}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={{
+                    color: "#F2F0EA",
+                    fontWeight: "900",
+                    fontSize: 14,
+                  }}
+                >
+                  ← Go to Previous Screen
+                </Text>
+              </TouchableOpacity>
+            );
+          },
+        })}
       />
 
       {isLoading ? (

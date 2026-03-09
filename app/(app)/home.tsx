@@ -1,102 +1,89 @@
-// app/(app)/home.tsx — NEW FILE (True Home)
-// ✅ Intro + 2 buttons: Profile + Applications
-// ✅ Uses push() so stack history exists (back buttons work)
+// app/(app)/home.tsx — FULL REPLACEMENT
+// ✅ Keeps ALL text
+// ✅ Removes tile behind title + text
+// ✅ Keeps clean spacing
+// ✅ Removes Previous Screen from grey header
+// ✅ Removes back arrow completely
+// ✅ Uses global AppScreen wrapper
 
 import { Stack, useRouter } from "expo-router";
 import React from "react";
-import {
-  ImageBackground,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import AppScreen from "../../components/AppScreen";
 
 export default function Home() {
   const router = useRouter();
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-      <Stack.Screen options={{ title: "Home" }} />
+    <AppScreen scroll>
+      <Stack.Screen
+        options={{
+          headerBackVisible: false,
+          headerBackTitle: "",
+          title: "",
+        }}
+      />
 
-      <ImageBackground
-        source={require("../../assets/images/background_image.png")}
-        style={styles.bg}
-        resizeMode="cover"
+      <View style={styles.textWrap}>
+        <View style={{ height: 40 }} />
+        <Text style={styles.title}>Welcome to Inner Wisdom</Text>
+
+        <View style={{ height: 10 }} />
+
+        <Text style={styles.body}>
+          Inner Wisdom is a private space to record your spoken thoughts and hear them played back with calm clarity
+        </Text>
+
+        <View style={{ height: 20 }} />
+
+        <Text style={styles.body}>
+          Listening to your own voice quiets the inner noise and brings you back to what truly matters the most
+        </Text>
+
+        <View style={{ height: 20 }} />
+
+        <Text style={styles.body}>
+          Inner Wisdom turns your thoughts into a steady grounding practice you can return to at anytime
+        </Text>
+
+        <View style={{ height: 20 }} />
+
+        <Text style={styles.body}>
+          Use the buttons below to access the Inner Wisdom application or to manage
+          your user profile.
+        </Text>
+
+        <View style={{ height: 30 }} />
+
+      </View>
+
+      <TouchableOpacity
+        activeOpacity={0.9}
+        style={[styles.btn, styles.btnPrimary]}
+        onPress={() => router.push("/(app)/main")}
       >
-        <View style={styles.overlay} />
+        <Text style={styles.btnText}>Go to Your Inner Wisdom App</Text>
+      </TouchableOpacity>
 
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          showsVerticalScrollIndicator={false}
-          bounces={false}
-        >
-          <View style={styles.card}>
-            <Text style={styles.title}>Welcome to Gentle Echo</Text>
+      <View style={{ height: 20 }} />
 
-            <Text style={styles.body}>
-              Gentle Echo consists of three (3) sepearate applications that helps you create a personalized audio experience 
-            </Text>
+      <TouchableOpacity
+        activeOpacity={0.9}
+        style={[styles.btn, styles.btnSecondary]}
+        onPress={() => router.push("/(app)/profile")}
+      >
+        <Text style={styles.btnText}>Go to Your User Profile</Text>
+      </TouchableOpacity>
 
-            <Text style={styles.body}>
-              
-            </Text>
-
-            <View style={{ height: 12 }} />
-
-            <Text style={styles.body}>
-              Use the buttons below to access the applications or to manage your user profile
-            </Text>
-          </View>
-
-          <TouchableOpacity
-            activeOpacity={0.9}
-            style={[styles.btn, styles.btnPrimary]}
-            onPress={() => router.push("/(app)/welcome")}
-          >
-            <Text style={styles.btnText}>Go to Applications</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            activeOpacity={0.9}
-            style={[styles.btn, styles.btnSecondary]}
-            onPress={() => router.push("/(app)/profile")}
-          >
-            <Text style={styles.btnText}>Go to User Profile</Text>
-          </TouchableOpacity>
-
-          <View style={{ height: 18 }} />
-        </ScrollView>
-      </ImageBackground>
-    </SafeAreaView>
+      <View style={{ height: 18 }} />
+    </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#0B1020" },
-  bg: { flex: 1 },
-
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.30)",
-  },
-
-  scroll: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 26,
-    flexGrow: 1,
-  },
-
-  card: {
-    borderRadius: 18,
-    backgroundColor: "rgba(100, 255, 255, 0.33)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.16)",
-    padding: 16,
-    marginBottom: 14,
+  textWrap: {
+    marginBottom: 18,
+    paddingHorizontal: 6,
   },
 
   title: {

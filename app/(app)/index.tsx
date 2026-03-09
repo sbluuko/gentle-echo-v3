@@ -1,8 +1,8 @@
-// app/(app)/index.tsx — FULL REPLACEMENT (App Gate)
+// app/(app)/index.tsx — FULL REPLACEMENT
 // ✅ Not logged in -> /(auth)
-// ✅ Not trained (voice_ready + voice_id missing) -> /(app)/train
+// ✅ Not trained -> /(app)/train
 // ✅ Trained -> /(app)/home
-// ✅ Uses replace() intentionally (gate screens should not be "back navigable")
+// ✅ Uses replace() intentionally for gate flow
 
 import { useRouter } from "expo-router";
 import React, { useEffect } from "react";
@@ -20,23 +20,22 @@ export default function AppIndex() {
 
     const go = async () => {
       try {
-        const { data } = await supabase.auth.getSession();
-        const user = data?.session?.user;
+        const { data, error } = await supabase.auth.getSession();
 
-        if (!user) {
+        if (error || !data?.session?.user) {
           if (!cancelled) router.replace("/(auth)");
           return;
         }
 
-        // Check voice status
-        const { data: profile, error } = await supabase
+        const userId = data.session.user.id;
+
+        const { data: profile, error: profileError } = await supabase
           .from("profiles")
           .select("voice_ready, voice_id")
-          .eq("id", user.id)
+          .eq("id", userId)
           .single();
 
-        // If profile can't be read, safest default is training gate
-        if (error || !profile?.voice_ready || !profile?.voice_id) {
+        if (profileError || !profile?.voice_ready || !profile?.voice_id) {
           if (!cancelled) router.replace(TRAIN_ROUTE);
           return;
         }
@@ -48,6 +47,7 @@ export default function AppIndex() {
     };
 
     go();
+
     return () => {
       cancelled = true;
     };
@@ -62,6 +62,13 @@ export default function AppIndex() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: "center", justifyContent: "center" },
-  text: { marginTop: 10, opacity: 0.7 },
+  container: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  text: {
+    marginTop: 10,
+    opacity: 0.7,
+  },
 });

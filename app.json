@@ -18,7 +18,7 @@
       "bundleIdentifier": "com.gentleechov2.app",
       "buildNumber": "2",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "Gentle Echo uses the microphone so you can record a reflection and hear it echoed back with calm and clarity.",
+        "NSMicrophoneUsageDescription": "Inner Wisdom uses the microphone so you can record a reflection and hear it echoed back with calm and clarity.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },

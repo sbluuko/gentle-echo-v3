@@ -81,7 +81,7 @@ export default function ForgotPassword() {
           ]}
         >
           <Text style={styles.kicker}>Reset your password</Text>
-          <Text style={styles.title}>Gentle Echo</Text>
+          <Text style={styles.title}>Inner Wisdom</Text>
           <Text style={styles.subtitle}>
             Enter your email and we’ll send you a reset link.
           </Text>

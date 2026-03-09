@@ -1,9 +1,9 @@
 // app/(app)/main.tsx — FULL REPLACEMENT
-// ✅ Uses global AppScreen background (matches Welcome/Home)
-// ✅ Keeps ALL existing Voice Echo logic + UI
-// ✅ Header title set (Stack)
+// ✅ Uses global AppScreen background
+// ✅ Keeps Voice Echo logic + UI
+// ✅ Removes bottom debug writing
 // ✅ Echo Library navigation uses router.push() so Back works
-// ✅ Still gates to Train if voice not ready (replace is correct for gate)
+// ✅ Still gates to Train if voice not ready
 
 import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
@@ -18,10 +18,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { supabase } from "../../lib/supabase";
-
-// ✅ Global wrapper + consistent buttons (your shared look)
 import AppScreen from "../../components/AppScreen";
+import { supabase } from "../../lib/supabase";
 
 const MAKE_PROCESSMESSAGE_URL =
   "https://hook.us2.make.com/3warr9f3b4llyy8lfzod7tksl3n82vfw";
@@ -29,7 +27,6 @@ const MAKE_PROCESSMESSAGE_URL =
 const MAKE_DELETE_S3_URL =
   "https://hook.us2.make.com/j7o2lb216xmcfr3ex8gmnt014qaicnya";
 
-// Local Echo Library (last 5)
 const ECHO_LIBRARY_JSON = "gentleecho_echo_library.json";
 const ECHO_LIBRARY_DIR = "gentleecho_echos";
 
@@ -57,13 +54,12 @@ const RECORDING_OPTIONS: Audio.RecordingOptions = {
   web: undefined as any,
 };
 
-// ---------- waveform helpers ----------
 const clamp = (n: number, min: number, max: number) =>
   Math.max(min, Math.min(max, n));
 
 const meteringToLevel = (db: number | undefined) => {
   if (db === undefined || db === null) return 0;
-  const normalized = (db + 60) / 60; // -60 -> 0, 0 -> 1
+  const normalized = (db + 60) / 60;
   return clamp(normalized, 0, 1);
 };
 
@@ -106,8 +102,8 @@ function WaveformBars({ active, level }: { active: boolean; level: number }) {
 type EchoItem = {
   id: string;
   title: string;
-  createdAt: string; // ISO
-  localUri: string; // file://
+  createdAt: string;
+  localUri: string;
 };
 
 export default function Main() {
@@ -118,17 +114,12 @@ export default function Main() {
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-
   const [statusLine, setStatusLine] = useState<string>("Ready to record");
   const [waveLevel, setWaveLevel] = useState(0);
 
-  // Prevent overlapping processing jobs
   const jobInFlightRef = useRef(false);
-
-  // Mounted guard
   const mountedRef = useRef(true);
 
-  // Fade-in
   const fade = useRef(new Animated.Value(0)).current;
   const lift = useRef(new Animated.Value(10)).current;
 
@@ -139,7 +130,6 @@ export default function Main() {
     ]).start();
   }, [fade, lift]);
 
-  // ========= local echo library helpers =========
   const getDocBase = () => {
     const fs: any = FileSystem as any;
     return fs?.documentDirectory ?? null;
@@ -202,12 +192,11 @@ export default function Main() {
   const addEchoToLibrary = async (localUri: string): Promise<string> => {
     const id = `${Date.now()}`;
     const createdAt = new Date().toISOString();
-    const title = `Echo ${new Date().toLocaleString()}`;
+    const title = `Inner Wisdom ${new Date().toLocaleString()}`;
 
     const items = await readLibrary();
     const next: EchoItem[] = [{ id, title, createdAt, localUri }, ...items];
 
-    // Keep only last 5; delete files for anything falling off
     const keep = next.slice(0, 5);
     const removed = next.slice(5);
 
@@ -219,7 +208,6 @@ export default function Main() {
     return id;
   };
 
-  // ========= audio mode helpers =========
   const setIdleAudioMode = async () => {
     await Audio.setAudioModeAsync({
       allowsRecordingIOS: false,
@@ -234,7 +222,6 @@ export default function Main() {
     });
   };
 
-  // Gate: keep user out of Main if voice not ready
   const ensureVoiceReadyOrRedirect = async () => {
     try {
       const { data: auth } = await supabase.auth.getUser();
@@ -255,7 +242,7 @@ export default function Main() {
       if (error) return;
 
       if (!profile?.voice_ready || !profile?.voice_id) {
-        router.replace("/(app)/train"); // ✅ gate uses replace
+        router.replace("/(app)/train");
       }
     } catch {
       // silent
@@ -274,10 +261,8 @@ export default function Main() {
     return () => {
       mountedRef.current = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [router]);
 
-  // ========= recording =========
   const startRecording = async () => {
     try {
       if (busy || isRecording || jobInFlightRef.current) return;
@@ -356,7 +341,6 @@ export default function Main() {
     }
   };
 
-  // ========= delete webhook (best-effort, short timeout) =========
   const callDeleteS3Webhook = async (userId: string, s3Key: string) => {
     try {
       if (!s3Key) return;
@@ -377,7 +361,6 @@ export default function Main() {
     }
   };
 
-  // ========= processing =========
   const processMessageDownloadSaveAndGoToLibrary = async (uriToSend: string) => {
     if (jobInFlightRef.current) return;
     jobInFlightRef.current = true;
@@ -463,7 +446,6 @@ export default function Main() {
 
       setStatusLine("Opening Echo Library…");
 
-      // ✅ IMPORTANT: push() so back button exists
       router.push({
         pathname: "/(app)/echo-library",
         params: { autoplay: "1", id: echoId },
@@ -518,17 +500,15 @@ export default function Main() {
       <Stack.Screen options={{ title: "VOICE ECHO" }} />
 
       <Animated.View style={[styles.inner, { opacity: fade, transform: [{ translateY: lift }] }]}>
-        {/* STEP tile */}
         <View style={styles.stepCard}>
           <StepLine label="STEP 1:" text="Press the RECORD button and record your thoughts" />
           <StepLine label="STEP 2:" text="When finished recording press the STOP button" />
-          <StepLine label="STEP 3:" text="Select CREATE AN ECHO button to create your playback message" />
-          <StepLine label="STEP 4:" text="When the message is ready you will automatically be taken to your Echo Library" />
+          <StepLine label="STEP 3:" text="Select CREATE MY INNER WISDOM button to create your playback message" />
+          <StepLine label="STEP 4:" text="When the message is ready you will automatically be taken to your Inner Wisdom Library" />
         </View>
 
         <View style={styles.spaceHeaderToRecord} />
 
-        {/* Recording Panel */}
         <View style={styles.recordPanel}>
           <Text style={styles.recordTitle}>Record Your Message</Text>
 
@@ -536,7 +516,6 @@ export default function Main() {
 
           <View style={styles.spaceWaveToButtons} />
 
-          {/* Row: RECORD (2x) + STOP (1x) */}
           <View style={styles.recordStopRow}>
             <TouchableOpacity
               activeOpacity={0.9}
@@ -569,7 +548,6 @@ export default function Main() {
 
           <View style={styles.spaceRowToCreate} />
 
-          {/* CREATE AN ECHO */}
           <TouchableOpacity
             activeOpacity={0.9}
             onPress={createEcho}
@@ -580,11 +558,10 @@ export default function Main() {
               !canCreate && styles.disabled,
             ]}
           >
-            <Text style={styles.squareActionText}>CREATE AN ECHO</Text>
+            <Text style={styles.squareActionText}>CREATE MY INNER WISDOM</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Status tile */}
         <View style={styles.gapRecordToStatus} />
 
         <View style={styles.statusCardSmall}>
@@ -599,20 +576,15 @@ export default function Main() {
           ) : null}
         </View>
 
-        {/* Standalone green button */}
         <View style={styles.gapStatusToLibraryBtn} />
+
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={() => router.push("/(app)/echo-library")}
           style={styles.libraryButtonGreen}
         >
-          <Text style={styles.libraryButtonText}>GO TO MY ECHO LIBRARY</Text>
+          <Text style={styles.libraryButtonText}>GO TO MY INNER WISDOM LIBRARY</Text>
         </TouchableOpacity>
-
-        {/* hidden debug */}
-        <Text selectable style={styles.hiddenDebug}>
-          {recordedUri ? `last_recorded_uri=${recordedUri}` : ""}
-        </Text>
 
         <View style={{ height: 10 }} />
       </Animated.View>
@@ -625,26 +597,24 @@ const COLORS = {
   textSoft: "rgba(242,240,234,0.82)",
   textDim: "rgba(242,240,234,0.70)",
 
-  panel: "rgba(19,167,154,0.70)",
+  panel: "rgba(19, 31, 167, 0.7)",
   panelBorder: "rgba(255,255,255,0.14)",
 
   actionGreen: "rgba(34,197,94,0.78)",
   actionRed: "rgba(239,68,68,0.78)",
   actionBlue: "rgba(59,130,246,0.78)",
 
-  waveBg: "rgba(255,255,255,0.3)",
-  waveBorder: "rgba(255,255,255,0.12)",
+  waveBg: "rgba(255,255,255,0.15)",
+  waveBorder: "rgba(238, 230, 230, 0.35)",
 
   libraryGreen: "rgba(34,197,94,0.80)",
 };
 
 const styles = StyleSheet.create({
-  // Inner wrapper inside AppScreen
   inner: {
     paddingTop: 6,
   },
 
-  // STEP tile
   stepCard: {
     borderRadius: 18,
     backgroundColor: COLORS.panel,
@@ -678,7 +648,6 @@ const styles = StyleSheet.create({
 
   spaceHeaderToRecord: { height: 18 },
 
-  // Recording Panel
   recordPanel: {
     borderRadius: 18,
     backgroundColor: COLORS.panel,
@@ -713,7 +682,7 @@ const styles = StyleSheet.create({
   waveBar: {
     width: 5,
     borderRadius: 3,
-    backgroundColor: "rgba(242,240,234,0.90)",
+    backgroundColor: "rgba(241, 242, 234, 0.95)",
   },
 
   spaceWaveToButtons: { height: 14 },
@@ -757,7 +726,6 @@ const styles = StyleSheet.create({
 
   spaceRowToCreate: { height: 12 },
 
-  // Status smaller
   gapRecordToStatus: { height: 12 },
 
   statusCardSmall: {
@@ -821,11 +789,4 @@ const styles = StyleSheet.create({
   },
 
   disabled: { opacity: 0.6 },
-
-  hiddenDebug: {
-    marginTop: 10,
-    fontSize: 11,
-    opacity: 0.12,
-    color: COLORS.text,
-  },
 });

@@ -7,14 +7,14 @@
 import { Stack, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-    Alert,
-    ImageBackground,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  ImageBackground,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../lib/supabase";
@@ -269,11 +269,13 @@ const styles = StyleSheet.create({
   btnSecondary: {
     backgroundColor: "rgba(255,255,255,0.18)",
     borderColor: "rgba(255,255,255,0.18)",
+    marginTop: 28,
   },
 
   btnDanger: {
     backgroundColor: "rgba(239,68,68,0.70)",
     borderColor: "rgba(255,255,255,0.18)",
+    marginTop: 28,
   },
 
   btnText: {

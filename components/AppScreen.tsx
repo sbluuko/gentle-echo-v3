@@ -26,7 +26,7 @@ export default function AppScreen({ children, scroll = true, contentStyle }: Pro
   );
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.safe} edges={["bottom"]}>
       <ImageBackground
         source={require("../assets/images/background_image.png")}
         style={styles.bg}
@@ -61,16 +61,16 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     top: 0,
-    height: "55%",
-    backgroundColor: "rgba(0,0,0,0.22)",
+    height: "50%",
+    backgroundColor: "rgba(0,0,0,0.70)",
   },
   overlayBottom: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    height: "65%",
-    backgroundColor: "rgba(0,0,0,0.32)",
+    height: "50%",
+    backgroundColor: "rgba(0,0,0,0.70)",
   },
 
   scroll: {

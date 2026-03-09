@@ -1,12 +1,14 @@
 // app/(auth)/index.tsx — FULL REPLACEMENT
-// ✅ Updated to newer Gentle Echo visual style
+// ✅ Updated to newer Inner Wisdom visual style
 // ✅ Background image + dark overlay
 // ✅ Keeps Sign In + Create Mode
 // ✅ Keeps signup success popup -> /(app)/train
 // ✅ Keeps forgot password
 // ✅ Keeps already-logged-in redirect
 // ✅ Keeps password mismatch handling
+// ✅ Adds subtle flashing icons inside Email + Password fields
 
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -40,6 +42,7 @@ export default function AuthIndex() {
 
   const fade = useRef(new Animated.Value(0)).current;
   const lift = useRef(new Animated.Value(8)).current;
+  const iconPulse = useRef(new Animated.Value(0.35)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -47,6 +50,29 @@ export default function AuthIndex() {
       Animated.timing(lift, { toValue: 0, duration: 420, useNativeDriver: true }),
     ]).start();
   }, [fade, lift]);
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(iconPulse, {
+          toValue: 1,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+        Animated.timing(iconPulse, {
+          toValue: 0.35,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    loop.start();
+
+    return () => {
+      loop.stop();
+    };
+  }, [iconPulse]);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,7 +88,7 @@ export default function AuthIndex() {
       } catch {}
     };
 
-    check();
+    void check();
 
     return () => {
       cancelled = true;
@@ -175,7 +201,7 @@ export default function AuthIndex() {
                 style={[styles.inner, { opacity: fade, transform: [{ translateY: lift }] }]}
               >
                 <Text style={styles.kicker}>Welcome to</Text>
-                <Text style={styles.title}>Gentle Echo</Text>
+                <Text style={styles.title}>Inner Wisdom</Text>
                 <Text style={styles.tagline}>A Quiet Space for Calm Reflections</Text>
 
                 <View style={styles.formCard}>
@@ -193,6 +219,10 @@ export default function AuthIndex() {
                       underlineColorAndroid="transparent"
                       textAlignVertical="center"
                     />
+
+                    <Animated.View style={[styles.inputIcon, { opacity: iconPulse }]}>
+                      <Ionicons name="mail-outline" size={18} color="#F2F0EA" />
+                    </Animated.View>
                   </View>
 
                   <View style={styles.inputWrapRow}>
@@ -209,6 +239,10 @@ export default function AuthIndex() {
                       underlineColorAndroid="transparent"
                       textAlignVertical="center"
                     />
+
+                    <Animated.View style={[styles.inputIconRow, { opacity: iconPulse }]}>
+                      <Ionicons name="lock-closed-outline" size={18} color="#F2F0EA" />
+                    </Animated.View>
 
                     <TouchableOpacity
                       style={styles.showHideBtn}
@@ -281,12 +315,18 @@ export default function AuthIndex() {
                 <Modal visible={showSignupSuccess} transparent animationType="fade" onRequestClose={() => {}}>
                   <View style={styles.modalOverlay}>
                     <View style={styles.modalCard}>
-                      <Text style={styles.modalTitle}>Account created</Text>
+                      <Text style={styles.modalTitle}>ACCOUNT CREATED</Text>
 
                       <Text style={styles.modalBody}>
-                        You have successfully created your Gentle Echo account. You will now be taken to our Voice
-                        Training page so we can learn and recreate your voice for all your future personalized play
-                        back recordings.
+                        You have successfully created your Inner Wisdom account. You will now be taken to a Voice
+                        Training page.
+                      </Text>
+
+                      <Text style={styles.modalBody}></Text>
+
+                      <Text style={styles.modalBody}>
+                        This is a one time recording that will be used to create your voice clone to be used for all your future personalized play
+                        back messages.
                       </Text>
 
                       <TouchableOpacity
@@ -387,6 +427,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     justifyContent: "center",
     marginBottom: 14,
+    position: "relative",
   },
 
   inputField: {
@@ -396,6 +437,7 @@ const styles = StyleSheet.create({
     margin: 0,
     borderWidth: 0,
     backgroundColor: "transparent",
+    paddingRight: 34,
   },
 
   inputWrapRow: {
@@ -408,6 +450,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingLeft: 16,
     marginBottom: 14,
+    position: "relative",
   },
 
   inputFieldRow: {
@@ -418,7 +461,21 @@ const styles = StyleSheet.create({
     margin: 0,
     borderWidth: 0,
     backgroundColor: "transparent",
-    paddingRight: 10,
+    paddingRight: 40,
+  },
+
+  inputIcon: {
+    position: "absolute",
+    right: 14,
+    top: "50%",
+    marginTop: -9,
+  },
+
+  inputIconRow: {
+    position: "absolute",
+    right: 66,
+    top: "50%",
+    marginTop: -9,
   },
 
   showHideBtn: {

@@ -1,4 +1,5 @@
 // app/(app)/train.tsx — FULL REPLACEMENT
+// ✅ Removes "Listen to Your Recording" button
 // ✅ Fixes iPhone false "must be at least 30 seconds" issue
 // ✅ Uses real elapsed time instead of trusting final iPhone recording metadata
 // ✅ Keeps your scroll + fixed footer layout
@@ -71,7 +72,7 @@ export default function Train() {
         durationIntervalRef.current = null;
       }
 
-      safeUnloadSound();
+      void safeUnloadSound();
 
       try {
         recordingRef.current?.stopAndUnloadAsync?.().catch(() => {});
@@ -144,7 +145,7 @@ export default function Train() {
         if (cancelled) return;
 
         if (!profErr && profile?.voice_ready === true && profile?.voice_id) {
-          router.replace("/(app)/welcome");
+          router.replace("/(app)/home");
           return;
         }
       } finally {
@@ -152,7 +153,7 @@ export default function Train() {
       }
     };
 
-    boot();
+    void boot();
     return () => {
       cancelled = true;
     };
@@ -161,15 +162,15 @@ export default function Train() {
   const scriptText = useMemo(
     () =>
       [
-        "I’m recording this script one time only to let Gentle Echo learn the natural sound of my voice so my reflections play back in a fully personalized message.",
+        "I’m recording this script one time only to let Inner Wisdom learn the natural sound of my voice so my recordings play back in a fully personalized message.",
         "",
         "There’s no need to speak perfectly. If I pause, repeat myself, or stumble over a word or two, that’s completely fine. Just keep on reading as natural speech actually helps create a better voice match.",
         "",
-        "My voice clone will be kept private and used only for my own reflections. I can delete my voice clone at any time.",
+        "My voice clone will be kept private and used only for my own recordings and I can delete my voice clone at any time.",
         "",
-        "Gentle Echo is where I can freely express my thoughts and receive a message of clarity in return. When stress hijacks my thinking, I can talk it out, clear my head and regain clarity.",
+        "Inner Wisdom is where I can freely express my thoughts and receive a message of clarity in return. When stress hijacks my thinking, I can talk it out, clear my head and ground myself.",
         "",
-        "I give my consent for Gentle Echo to create and securely store a private voice identifier for generating audio in my voice.",
+        "I give my consent for Inner Wisdom to create and securely store a private voice clone for generating audio in my voice.",
       ].join("\n"),
     []
   );
@@ -188,11 +189,9 @@ export default function Train() {
   };
 
   const updateDurationTimer = async () => {
-    // ✅ Use wall-clock elapsed time as primary truth
     const elapsedSec = getElapsedRecordingSeconds();
     setDurationSec(elapsedSec);
 
-    // Optional secondary check from Expo status, but do not trust it as primary
     try {
       const rec = recordingRef.current;
       if (!rec) return;
@@ -221,13 +220,13 @@ export default function Train() {
       await rec.startAsync();
 
       recordingRef.current = rec;
-
-      // ✅ Start elapsed-time clock only AFTER recording actually starts
       recordingStartedAtRef.current = Date.now();
       setDurationSec(0);
       setIsRecording(true);
 
-      durationIntervalRef.current = setInterval(updateDurationTimer, 250);
+      durationIntervalRef.current = setInterval(() => {
+        void updateDurationTimer();
+      }, 250);
     } catch (e: any) {
       Alert.alert("Recording error", String(e?.message ?? e));
       setIsRecording(false);
@@ -257,12 +256,9 @@ export default function Train() {
       const rec = recordingRef.current;
       if (!rec) return;
 
-      // ✅ Primary duration truth = real elapsed clock before stop clears things
       const elapsedSec = getElapsedRecordingSeconds();
 
       await rec.stopAndUnloadAsync();
-
-      // Small iPhone settle delay
       await new Promise((resolve) => setTimeout(resolve, 350));
 
       const uri = rec.getURI();
@@ -276,7 +272,6 @@ export default function Train() {
       recordingRef.current = null;
       setIsRecording(false);
 
-      // ✅ Use the larger of elapsed clock or Expo-reported duration
       const finalSec = Math.max(elapsedSec, statusDurationSec);
       setDurationSec(finalSec);
 
@@ -303,33 +298,6 @@ export default function Train() {
       try {
         await setPlaybackMode();
       } catch {}
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const playRecording = async () => {
-    if (!recordingUri || busy || isRecording || isCreating || bootChecking) return;
-
-    try {
-      setBusy(true);
-      await safeUnloadSound();
-      await setPlaybackMode();
-
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: recordingUri },
-        { shouldPlay: true }
-      );
-
-      soundRef.current = sound;
-
-      sound.setOnPlaybackStatusUpdate((st: any) => {
-        if (st?.didJustFinish) {
-          safeUnloadSound();
-        }
-      });
-    } catch (e: any) {
-      Alert.alert("Playback error", String(e?.message ?? e));
     } finally {
       setBusy(false);
     }
@@ -398,7 +366,6 @@ export default function Train() {
 
   const recordDisabled = disableAll || isRecording;
   const stopDisabled = disableAll || !isRecording;
-  const listenDisabled = disableAll || isRecording || !recordingUri;
   const createDisabled = disableAll || isRecording || !readyToCreate;
 
   const footerHeight = FOOTER_BASE_HEIGHT + insets.bottom;
@@ -410,7 +377,9 @@ export default function Train() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 16 : 0}
       >
-        <Animated.View style={[styles.screen, { opacity: fade, transform: [{ translateY: lift }] }]}>
+        <Animated.View
+          style={[styles.screen, { opacity: fade, transform: [{ translateY: lift }] }]}
+        >
           <ScrollView
             style={styles.scroll}
             contentContainerStyle={[
@@ -461,23 +430,16 @@ export default function Train() {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.footerRow}>
-              <TouchableOpacity
-                activeOpacity={0.9}
-                disabled={listenDisabled}
-                onPress={playRecording}
-                style={[styles.wideBtn, styles.blueBtn, listenDisabled && styles.btnDisabled]}
-              >
-                <Text style={styles.btnTextSmall}>Listen to Your Recording</Text>
-              </TouchableOpacity>
-
+            <View style={styles.footerRowSingle}>
               <TouchableOpacity
                 activeOpacity={0.9}
                 disabled={createDisabled}
                 onPress={uploadTraining}
-                style={[styles.wideBtn, styles.greenBtn, createDisabled && styles.btnDisabled]}
+                style={[styles.fullWidthBtn, styles.greenBtn, createDisabled && styles.btnDisabled]}
               >
-                <Text style={styles.btnTextSmall}>{isCreating ? "Creating…" : "Create Voice"}</Text>
+                <Text style={styles.btnTextSmall}>
+                  {isCreating ? "Creating…" : "Create Voice"}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -498,7 +460,7 @@ export default function Train() {
                   style={styles.modalButton}
                   onPress={() => {
                     setShowSuccessModal(false);
-                    router.replace("/(app)/welcome");
+                    router.replace("/(app)/home");
                   }}
                 >
                   <Text style={styles.modalButtonText}>Continue</Text>
@@ -574,6 +536,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
+  footerRowSingle: {
+    marginBottom: 10,
+  },
+
   squareBtn: {
     flex: 1,
     height: 64,
@@ -582,8 +548,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  wideBtn: {
-    flex: 1,
+  fullWidthBtn: {
+    width: "100%",
     height: 64,
     borderRadius: 8,
     justifyContent: "center",
@@ -593,7 +559,6 @@ const styles = StyleSheet.create({
 
   greenBtn: { backgroundColor: "#16a34a" },
   redBtn: { backgroundColor: "#dc2626" },
-  blueBtn: { backgroundColor: "#2563eb" },
 
   btnDisabled: { opacity: 0.45 },
 
