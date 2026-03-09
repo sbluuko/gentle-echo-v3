@@ -1,13 +1,7 @@
-// app/(app)/welcome.tsx — FULL REPLACEMENT (APPLICATIONS)
-// ✅ HARD GATE: user must never see this screen until voice_ready + voice_id exist
-// ✅ 3 tiles: VOICE ECHO, AFFIRMATIONS, BREATHING SYNC
-// ✅ Uses background_image.png + overlay (consistent global look)
-// ✅ Safe-area top/bottom handled properly (no hard-coded 90px hacks)
-// ✅ Scrolls if content doesn't fit
-// ✅ Uses router.push for proper back-stack behavior
+// app/(app)/welcome.tsx — FULL REPLACEMENT (REFLECTIONS ONLY)
 
 import { useRouter } from "expo-router";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -26,7 +20,6 @@ export default function Welcome() {
   const router = useRouter();
   const [checking, setChecking] = useState(true);
 
-  // Fade-in
   const fade = useRef(new Animated.Value(0)).current;
   const lift = useRef(new Animated.Value(8)).current;
 
@@ -37,7 +30,6 @@ export default function Welcome() {
     ]).start();
   }, [fade, lift]);
 
-  // HARD GATE: user must never see Home until voice profile exists
   useEffect(() => {
     let alive = true;
 
@@ -79,16 +71,9 @@ export default function Welcome() {
     return () => {
       alive = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [router]);
 
   const goReflect = () => router.push("/(app)/main");
-  const goAffirmations = () => router.push("/(app)/affirmations");
-  const goBreathingSync = () => router.push("/(app)/breathing-sync");
-
-  const headerTitle = useMemo(() => "Gentle Echo Applications", []);
-  const headerSub = useMemo(() => "Select from the applications below", []);
-
   const disabled = checking;
 
   return (
@@ -100,8 +85,20 @@ export default function Welcome() {
       >
         <View style={styles.overlay} />
 
-        <ScrollView contentContainerStyle={styles.scroll} bounces={false} showsVerticalScrollIndicator={false}>
-          <Animated.View style={[styles.inner, { opacity: fade, transform: [{ translateY: lift }] }]}>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          bounces={false}
+          showsVerticalScrollIndicator={false}
+        >
+          <Animated.View
+            style={[
+              styles.inner,
+              {
+                opacity: fade,
+                transform: [{ translateY: lift }],
+              },
+            ]}
+          >
             {checking ? (
               <View style={styles.checkingBox}>
                 <ActivityIndicator color={COLORS.text} />
@@ -109,41 +106,20 @@ export default function Welcome() {
               </View>
             ) : null}
 
-            {/* Title + subtitle */}
-            <Text style={styles.pageTitle}>{headerTitle}</Text>
-            <Text style={styles.pageSub}>{headerSub}</Text>
+            <Text style={styles.pageTitle}>Gentle Echo</Text>
+            <Text style={styles.pageSub}>
+              Record your reflections and hear them calmly played back to support
+              clarity, relaxation, and sleep
+            </Text>
 
-            <View style={{ height: 18 }} />
+            <View style={{ height: 24 }} />
 
-            {/* REFLECT */}
             <AppCard
               title="VOICE ECHO"
-              description="Record your thoughts and hear it calmly played back to you with clarity"
+              description="Record your thoughts and hear them calmly played back to you with clarity"
               color={COLORS.reflectCard}
               disabled={disabled}
               onPress={goReflect}
-            />
-
-            <View style={{ height: 16 }} />
-
-            {/* AFFIRMATIONS */}
-            <AppCard
-              title="AFFIRMATIONS"
-              description="Create your own 10 minute affirmation with background music"
-              color={COLORS.affirmCard}
-              disabled={disabled}
-              onPress={goAffirmations}
-            />
-
-            <View style={{ height: 16 }} />
-
-            {/* BREATHING SYNC */}
-            <AppCard
-              title="BREATHING SYNC"
-              description="Guide your breathing with a calming visual rhythm to help you downshift in real time"
-              color={COLORS.breathCard}
-              disabled={disabled}
-              onPress={goBreathingSync}
             />
 
             <View style={{ height: 26 }} />
@@ -186,11 +162,7 @@ function AppCard(props: {
 const COLORS = {
   text: "#F2F0EA",
   textDim: "rgba(242,240,234,0.74)",
-
   reflectCard: "rgba(19,167,154,0.50)",
-  affirmCard: "rgba(123,102,255,0.50)",
-  breathCard: "rgba(245, 158, 11, 0.50)",
-
   border: "rgba(255,255,255,0.14)",
   btnBg: "rgba(255,255,255,0.20)",
   btnBorder: "rgba(255,255,255,0.18)",
@@ -210,9 +182,13 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 26,
     flexGrow: 1,
+    justifyContent: "center",
   },
 
-  inner: { width: "100%" },
+  inner: {
+    width: "100%",
+    alignSelf: "center",
+  },
 
   checkingBox: {
     flexDirection: "row",
@@ -222,6 +198,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     marginBottom: 6,
   },
+
   checkingText: {
     color: COLORS.textDim,
     fontSize: 13,
@@ -230,17 +207,19 @@ const styles = StyleSheet.create({
 
   pageTitle: {
     color: COLORS.text,
-    fontSize: 26,
+    fontSize: 30,
     fontWeight: "900",
     textAlign: "center",
     marginTop: 6,
   },
+
   pageSub: {
     color: COLORS.textDim,
     fontSize: 14,
     lineHeight: 20,
     textAlign: "center",
-    marginTop: 4,
+    marginTop: 6,
+    paddingHorizontal: 8,
   },
 
   card: {
@@ -283,6 +262,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+
   selectText: {
     color: COLORS.text,
     fontSize: 13,

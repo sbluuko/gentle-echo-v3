@@ -1,4 +1,4 @@
-// app/(app)/_layout.tsx — FULL REPLACEMENT
+// app/(app)/_layout.tsx — FULL REPLACEMENT (REFLECTIONS ONLY)
 
 import { Stack, useRouter, useSegments } from "expo-router";
 import React, { useEffect, useMemo } from "react";
@@ -40,7 +40,11 @@ function AppLayoutInner() {
       return;
     }
 
-    // ✅ If trained, don't allow Train screen
+    if (!trainingDone && routeName !== "train") {
+      router.replace("/(app)/train");
+      return;
+    }
+
     if (trainingDone && routeName === "train") {
       router.replace("/(app)/welcome");
       return;
@@ -52,14 +56,8 @@ function AppLayoutInner() {
       <Stack
         screenOptions={{
           headerShown: true,
-
-          // ✅ Consistent back label everywhere (supported)
-          headerBackTitle: "Back to Previous Screen",
-
-          // ✅ IMPORTANT: keep a visible title so the header doesn't look empty.
-          // This prevents the "only arrow shows" look.
-          headerTitle: "Back to Previous Screen",
-
+          headerBackTitle: "Back",
+          headerTitle: "Gentle Echo",
           headerTintColor: "#F2F0EA",
           headerStyle: { backgroundColor: "#26384C" },
           headerTitleStyle: { fontWeight: "900" },
