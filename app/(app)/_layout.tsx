@@ -1,11 +1,12 @@
-// app/(app)/_layout.tsx — FULL REPLACEMENT (REFLECTIONS ONLY)
-// ✅ Global header uses text-only "Previous Screen" instead of arrow
+// app/(app)/_layout.tsx — FULL REPLACEMENT
+// ✅ Global header uses text-only "Go to Previous Screen" instead of arrow
 // ✅ Train page still has no header/back path once overridden in train.tsx
-// ✅ Home redirect after training
-// ✅ Auth + profile gate preserved
+// ✅ FIX: layout only handles auth gate
+// ✅ FIX: removes training redirect logic that can fight with train/home flow
+// ✅ Prevents flicker caused by stale profile state during post-training navigation
 
-import { Stack, useRouter, useSegments } from "expo-router";
-import React, { useEffect, useMemo } from "react";
+import { Stack, useRouter } from "expo-router";
+import React, { useEffect } from "react";
 import {
   ActivityIndicator,
   Text,
@@ -14,51 +15,19 @@ import {
 } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { useProfile } from "../../lib/useProfile";
 import { useSession } from "../../lib/useSession";
-
-function isTrainingComplete(
-  profile: { voice_id: string | null; voice_ready: boolean | null } | null
-) {
-  if (!profile) return false;
-  if (profile.voice_ready === true) return true;
-  if (profile.voice_id && profile.voice_id.length > 0) return true;
-  return false;
-}
 
 function AppLayoutInner() {
   const router = useRouter();
-  const segments = useSegments();
-
-  const routeName = useMemo(() => {
-    const last = Array.isArray(segments) ? segments[segments.length - 1] : "";
-    return typeof last === "string" ? last : "";
-  }, [segments]);
-
-  const { session, isLoading: sessionLoading } = useSession();
-  const { profile, isLoading: profileLoading } = useProfile();
-
-  const isLoading = sessionLoading || profileLoading;
-  const trainingDone = isTrainingComplete(profile);
+  const { session, isLoading } = useSession();
 
   useEffect(() => {
     if (isLoading) return;
 
     if (!session) {
       router.replace("/(auth)");
-      return;
     }
-
-    if (!trainingDone && routeName !== "train") {
-      router.replace("/(app)/train");
-      return;
-    }
-
-    if (trainingDone && routeName === "train") {
-      router.replace("/(app)/home");
-      return;
-    }
-  }, [isLoading, session, trainingDone, routeName, router]);
+  }, [isLoading, session, router]);
 
   return (
     <View style={{ flex: 1 }}>

@@ -4,6 +4,7 @@
 // ✅ Removes bottom debug writing
 // ✅ Echo Library navigation uses router.push() so Back works
 // ✅ Still gates to Train if voice not ready
+// ✅ Uses shared audio helper for consistent playback / recording mode
 
 import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
@@ -19,6 +20,7 @@ import {
   View,
 } from "react-native";
 import AppScreen from "../../components/AppScreen";
+import { setAppPlaybackAudioMode, setAppRecordingAudioMode } from "../../lib/audio";
 import { supabase } from "../../lib/supabase";
 
 const MAKE_PROCESSMESSAGE_URL =
@@ -208,20 +210,6 @@ export default function Main() {
     return id;
   };
 
-  const setIdleAudioMode = async () => {
-    await Audio.setAudioModeAsync({
-      allowsRecordingIOS: false,
-      playsInSilentModeIOS: true,
-    });
-  };
-
-  const setRecordingAudioMode = async () => {
-    await Audio.setAudioModeAsync({
-      allowsRecordingIOS: true,
-      playsInSilentModeIOS: true,
-    });
-  };
-
   const ensureVoiceReadyOrRedirect = async () => {
     try {
       const { data: auth } = await supabase.auth.getUser();
@@ -253,13 +241,29 @@ export default function Main() {
     mountedRef.current = true;
 
     (async () => {
-      await setIdleAudioMode();
+      await setAppPlaybackAudioMode();
       await ensureVoiceReadyOrRedirect();
       await ensureLibraryDir();
     })();
 
     return () => {
       mountedRef.current = false;
+      const rec = recordingRef.current;
+      recordingRef.current = null;
+
+      void (async () => {
+        try {
+          if (rec) {
+            try {
+              await rec.stopAndUnloadAsync();
+            } catch {}
+          }
+        } finally {
+          try {
+            await setAppPlaybackAudioMode();
+          } catch {}
+        }
+      })();
     };
   }, [router]);
 
@@ -277,7 +281,7 @@ export default function Main() {
         return;
       }
 
-      await setRecordingAudioMode();
+      await setAppRecordingAudioMode();
 
       const rec = new Audio.Recording();
       rec.setOnRecordingStatusUpdate((st: any) => {
@@ -297,6 +301,10 @@ export default function Main() {
       setStatusLine("Error starting recording.");
       setIsRecording(false);
       setWaveLevel(0);
+
+      try {
+        await setAppPlaybackAudioMode();
+      } catch {}
     } finally {
       setBusy(false);
     }
@@ -310,7 +318,7 @@ export default function Main() {
     const uri = rec.getURI();
     recordingRef.current = null;
 
-    await setIdleAudioMode();
+    await setAppPlaybackAudioMode();
 
     setIsRecording(false);
     setWaveLevel(0);
@@ -336,6 +344,10 @@ export default function Main() {
       setStatusLine("Error stopping recording.");
       setIsRecording(false);
       setWaveLevel(0);
+
+      try {
+        await setAppPlaybackAudioMode();
+      } catch {}
     } finally {
       setBusy(false);
     }
@@ -377,7 +389,7 @@ export default function Main() {
         return;
       }
 
-      setStatusLine("Processing your echo. This may take a couple of minutes");
+      setStatusLine("Processing your echo. This may take a couple of minutes. When complete you will automatically be taken to your Inner Wisdom library");
 
       const fs: any = FileSystem as any;
       const uploadType =
@@ -445,6 +457,7 @@ export default function Main() {
       const echoId = await addEchoToLibrary(target);
 
       setStatusLine("Opening Echo Library…");
+      await setAppPlaybackAudioMode();
 
       router.push({
         pathname: "/(app)/echo-library",
@@ -454,6 +467,10 @@ export default function Main() {
       const msg = String(e?.message ?? e);
       Alert.alert("Error", msg);
       setStatusLine("Something went wrong. Try again.");
+
+      try {
+        await setAppPlaybackAudioMode();
+      } catch {}
     } finally {
       jobInFlightRef.current = false;
     }
@@ -478,6 +495,10 @@ export default function Main() {
     } catch (e: any) {
       Alert.alert("Error", String(e?.message ?? e));
       setStatusLine("Error creating echo.");
+
+      try {
+        await setAppPlaybackAudioMode();
+      } catch {}
     } finally {
       if (mountedRef.current) setBusy(false);
     }

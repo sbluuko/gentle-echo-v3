@@ -6,6 +6,7 @@
 // ✅ Keeps autoplay support
 // ✅ Keeps play / stop / remove behavior
 // ✅ Fixes useEffect cleanup error
+// ✅ Uses shared audio helper for consistent playback mode
 
 import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
@@ -21,6 +22,7 @@ import {
   View,
 } from "react-native";
 import AppScreen from "../../components/AppScreen";
+import { setAppPlaybackAudioMode } from "../../lib/audio";
 
 const ECHO_LIBRARY_JSON = "gentleecho_echo_library.json";
 
@@ -82,19 +84,17 @@ export default function EchoLibrary() {
       }
     } catch {}
     setPlayingId(null);
-  };
 
-  const setIdleAudioMode = async () => {
-    await Audio.setAudioModeAsync({
-      allowsRecordingIOS: false,
-      playsInSilentModeIOS: true,
-    });
+    try {
+      await setAppPlaybackAudioMode();
+    } catch {}
   };
 
   const refresh = async () => {
     setLoading(true);
     try {
-      await setIdleAudioMode();
+      await setAppPlaybackAudioMode();
+
       const lib = await readLibrary();
 
       const pruned: EchoItem[] = [];
@@ -125,7 +125,7 @@ export default function EchoLibrary() {
       }
 
       await stopAndUnload();
-      await setIdleAudioMode();
+      await setAppPlaybackAudioMode();
 
       const { sound } = await Audio.Sound.createAsync(
         { uri: it.localUri },
@@ -135,14 +135,18 @@ export default function EchoLibrary() {
       soundRef.current = sound;
       setPlayingId(it.id);
 
-      sound.setOnPlaybackStatusUpdate(async (st: any) => {
+      sound.setOnPlaybackStatusUpdate((st: any) => {
         if (st?.isLoaded && st?.didJustFinish) {
-          await stopAndUnload();
+          void stopAndUnload();
         }
       });
     } catch (e: any) {
       Alert.alert("Playback error", String(e?.message ?? e));
       setPlayingId(null);
+
+      try {
+        await setAppPlaybackAudioMode();
+      } catch {}
     }
   };
 
@@ -162,6 +166,8 @@ export default function EchoLibrary() {
       const next = items.filter((x) => x.id !== it.id);
       setItems(next);
       await writeLibrary(next);
+
+      await setAppPlaybackAudioMode();
     } catch {
       // silent
     }

@@ -2,7 +2,7 @@
   "expo": {
     "name": "GentleEcho",
     "slug": "GentleEcho",
-    "version": "1.0.6",
+    "version": "1.0.8",
     "orientation": "portrait",
     "icon": "./assets/images/GentleEchoLogo.png",
     "scheme": "gentleecho",
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.gentleechov2.app",
-      "buildNumber": "2",
+      "buildNumber": "4",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Inner Wisdom uses the microphone so you can record a reflection and hear it echoed back with calm and clarity.",
         "ITSAppUsesNonExemptEncryption": false
@@ -24,7 +24,7 @@
     },
     "android": {
       "package": "com.gentleechov2.app",
-      "versionCode": 6,
+      "versionCode": 8,
       "permissions": [
         "RECORD_AUDIO"
       ],

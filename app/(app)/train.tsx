@@ -5,6 +5,8 @@
 // ✅ Keeps your scroll + fixed footer layout
 // ✅ Keeps boot guard + success modal
 // ✅ Safely switches audio mode between record and playback
+// ✅ FIX: training only completes when a real voice_id is returned
+// ✅ FIX: no more half-finished state with voice_ready=true and voice_id=null
 
 import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
@@ -144,7 +146,7 @@ export default function Train() {
 
         if (cancelled) return;
 
-        if (!profErr && profile?.voice_ready === true && profile?.voice_id) {
+        if (!profErr && !!profile?.voice_ready && !!profile?.voice_id) {
           router.replace("/(app)/home");
           return;
         }
@@ -334,13 +336,25 @@ export default function Train() {
       if (rawBody && typeof rawBody === "string") {
         try {
           const parsed = JSON.parse(rawBody);
-          if (typeof parsed?.voice_id === "string") returnedVoiceId = parsed.voice_id;
-          if (typeof parsed?.voiceId === "string") returnedVoiceId = parsed.voiceId;
+          if (typeof parsed?.voice_id === "string" && parsed.voice_id.trim()) {
+            returnedVoiceId = parsed.voice_id.trim();
+          }
+          if (!returnedVoiceId && typeof parsed?.voiceId === "string" && parsed.voiceId.trim()) {
+            returnedVoiceId = parsed.voiceId.trim();
+          }
         } catch {}
       }
 
-      const updatePayload: any = { voice_ready: true };
-      if (returnedVoiceId) updatePayload.voice_id = returnedVoiceId;
+      if (!returnedVoiceId) {
+        throw new Error(
+          "Voice creation did not return a voice ID. Your training was not completed. Please try again."
+        );
+      }
+
+      const updatePayload = {
+        voice_ready: true,
+        voice_id: returnedVoiceId,
+      };
 
       const { error: updErr } = await supabase
         .from("profiles")
@@ -385,7 +399,7 @@ export default function Train() {
             contentContainerStyle={[
               styles.scrollContent,
               {
-                paddingTop: 48,
+                paddingTop: 24,
                 paddingBottom: footerHeight + 12,
               },
             ]}
